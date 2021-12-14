@@ -11,7 +11,7 @@ async function connect(server, roomId, displayName) {
     const session = await client.getSession(server)
     const room = await session.joinRoom(roomId)
     const pub = await room.publish({display: displayName})
-    pub.onLocalStream(stream => makeDisplay("You").update(stream))
+    pub.onLocalStream(stream => makeDisplay(displayName).update(stream))
     const subs = {}
     room.onPublisherAdded(publishers => publishers.forEach(subscribe))
     room.onPublisherRemoved(unsubscribe)
@@ -26,7 +26,7 @@ async function connect(server, roomId, displayName) {
         })
     }
     async function unsubscribe(publisherId) {
-        subs[publisherId].unsubscribe()
+        await subs[publisherId].unsubscribe()
         if (subs[publisherId].display) subs[publisherId].display.remove()
     }
 }
