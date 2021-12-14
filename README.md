@@ -1,5 +1,5 @@
 # janus-videoroom-js
-A promise-based, type-annotated Javascript library for working with the Janus VideoRoom plugin (built on top of janus.js)
+A Javascript client library for working with the Janus VideoRoom plugin (built on top of janus.js)
 
 ## Usage
 ```javascript

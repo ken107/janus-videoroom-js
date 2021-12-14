@@ -384,7 +384,7 @@ function createVideoRoomSubscriber(session, roomId, streams) {
                             }
                         })
                         .then(function(response) {
-                            if (response.jsep) handleOffer(response.jsep)
+                            if (response.jsep) return handleOffer(response.jsep)
                         })
                     },
                     removeStreams: function(streams) {
@@ -395,7 +395,7 @@ function createVideoRoomSubscriber(session, roomId, streams) {
                             }
                         })
                         .then(function(response) {
-                            if (response.jsep) handleOffer(response.jsep)
+                            if (response.jsep) return handleOffer(response.jsep)
                         })
                     },
                     pause: function() {
