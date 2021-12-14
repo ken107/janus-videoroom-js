@@ -5,54 +5,47 @@
 /** @type {Promise<VideoRoomClient>} */
 const clientReady = createVideoRoomClient()
 
-/* Use a single (multi-stream) subscriber for all subscriptions */
-/** @type {Promise<VideoRoomSubscriber} */
-let subscriberPromise
 
-
-async function connect(server, displayName) {
+async function connect(server, roomId, displayName) {
     const client = await clientReady
     const session = await client.getSession(server)
-    
-    const room = await session.joinRoom("room-1234")
-    room.onPublisherAdded(subscribeToPublisher)
-    room.onPublisherRemoved(unsubscribeFromPublisher)
-    
-    const publisher = await room.publish({display: displayName})
-    publisher.onTrackAdded(showLocalTrack)
-    publisher.onTrackRemoved(hideLocalTrack)
-
-    return {room, publisher}
-}
+    const room = await session.joinRoom(roomId)
+    const pub = await room.publish({display: displayName})
+    pub.onLocalStream(stream => makeDisplay("You").update(stream))
+    const subs = {}
+    room.onPublisherAdded(publishers => publishers.forEach(subscribe))
+    room.onPublisherRemoved(unsubscribe)
+    return {room, publisher: pub, subscribers: subs}
 
 
-async function subscribeToPublisher(publishers) {
-    if (subscriberPromise) {
-        const subscriber = await subscriberPromise
-        await subscriber.addStreams(publishers.map(p => ({feed: p.id})))
+    async function subscribe(publisher) {
+        subs[publisher.id] = await room.subscribe([{feed: publisher.id}])
+        subs[publisher.id].onRemoteStream(stream => {
+            if (!subs[publisher.id].display) subs[publisher.id].display = makeDisplay(publisher.display)
+            subs[publisher.id].display.update(stream)
+        })
     }
-    else {
-        subscriberPromise = room.subscribe(publishers.map(p => ({feed: p.id})))
-        const subscriber = await subscriberPromise
-        subscriber.onTrackAdded(showRemoteTrack)
-        subscriber.onTrackRemoved(hideRemoteTrack)
+    async function unsubscribe(publisherId) {
+        subs[publisherId].unsubscribe()
+        if (subs[publisherId].display) subs[publisherId].display.remove()
     }
 }
 
-function unsubscribeFromPublisher(publisherId) {
-    const subscriber = await subscriberPromise
-    await subscriber.removeStreams([{feed: publisherId}])
+
+function makeDisplay(displayName) {
+    const $display = $("<div class='display'><div class='name'></div><video autoplay></video></div>").appendTo("#displays")
+    $display.find(".name").text(displayName)
+    return {
+        update: stream => Janus.attachMediaStream($display.find("video").get(0), stream),
+        remove: () => $display.remove()
+    }
 }
 
-
-function showLocalTrack(track) {
-}
-
-function hideLocalTrack(track) {
-}
-
-function showRemoteTrack(track, mid) {
-}
-
-function hideRemoteTrack(track, mid) {
-}
+$(function() {
+    $("#main-form").submit(function() {
+        connect(this.server.value, Number(this.roomId.value), this.displayName.value)
+            .then(() => $(this).hide())
+            .catch(console.error)
+        return false
+    })
+})

@@ -5,10 +5,32 @@
     <meta http-equiv="X-UA-Compatible" content="IE=edge">
     <title>VideoRoom Example</title>
 
+    <style>
+        .display {
+            display: inline-block;
+            margin: 0 2em 2em 0;
+        }
+        .display .name {
+            position: absolute;
+            background-color: black;
+            color: white;
+        }
+    </style>
+
+    <script src="https://webrtc.github.io/adapter/adapter-latest.js"></script>
+    <script src="https://ajax.googleapis.com/ajax/libs/jquery/3.6.0/jquery.min.js"></script>
+    <script src="./janus.js"></script>
     <script src="./videoroom.js"></script>
     <script src="./example.js"></script>
 </head>
 <body>
+    <form id="main-form">
+        <input type="text" name="server" value="wss://janus.conf.meetecho.com/ws" required>
+        <input type="number" name="roomId" value="5678" required>
+        <input type="text" name="displayName" value="" placeholder="My Name" required>
+        <button type="submit">Join</button>
+    </form>
 
+    <div id="displays"></div>
 </body>
 </html>

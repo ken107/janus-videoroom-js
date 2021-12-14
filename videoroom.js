@@ -20,15 +20,13 @@
 
 /**
  * @typedef {Object} VideoRoomPublisher
- * @property {(callback: (track: MediaStreamTrack) => void) => void} onTrackAdded
- * @property {(callback: (track: MediaStreamTrack) => void) => void} onTrackRemoved
+ * @property {(callback: (stream: MediaStream) => void) => void} onLocalStream
  * @property {() => Promise<void>} unpublish
  */
 
 /**
  * @typedef {Object} VideoRoomSubscriber
- * @property {(callback: (track: MediaStreamTrack, mid: any) => void) => void} onTrackAdded
- * @property {(callback: (track: MediaStreamTrack, mid: any) => void) => void} onTrackRemoved
+ * @property {(callback: (stream: MediaStream) => void) => void} onRemoteStream
  * @property {(streams: any[]) => Promise<void>} addStreams
  * @property {(streams: any[]) => Promise<void>} removeStreams
  * @property {() => Promise<void>} pause
@@ -96,9 +94,11 @@ function createVideoRoomClient() {
 function createVideoRoomSession(server) {
     var isDestroyed = false
     return new Promise(function(fulfill, reject) {
-        return new Janus({
+        var session = new Janus({
             server: server,
-            success: fulfill,
+            success: function() {
+                fulfill(session)
+            },
             error: reject,
             destroyed: function() {
                 isDestroyed = true
@@ -153,11 +153,11 @@ function attachToPlugin(session) {
                 if (index != -1) pendingRequests.splice(index, 1)
                 else eventTarget.dispatchEvent(new CustomEvent("message", {detail: {message: message, jsep: jsep}}))
             },
-            onlocaltrack: function(track, added) {
-                eventTarget.dispatchEvent(new CustomEvent("localtrack", {detail: {track: track, added: added}}))
+            onlocalstream: function(stream) {
+                eventTarget.dispatchEvent(new CustomEvent("localstream", {detail: {stream: stream}}))
             },
-            onremotetrack: function(track, mid, added) {
-                eventTarget.dispatchEvent(new CustomEvent("remotetrack", {detail: {track: track, mid: mid, added: added}}))
+            onremotestream: function(stream) {
+                eventTarget.dispatchEvent(new CustomEvent("remotestream", {detail: {stream: stream}}))
             },
             ondataopen: function(label, protocol) {
                 eventTarget.dispatchEvent(new CustomEvent("dataopen", {detail: {label: label, protocol: protocol}}))
@@ -229,6 +229,18 @@ function attachToPlugin(session) {
 function joinVideoRoom(session, roomId) {
     return attachToPlugin(session)
         .then(function(handle) {
+            var callbacks = makeCallbacks()
+            handle.eventTarget.addEventListener("message", function(event) {
+                var message = event.detail.message
+                if (message.videoroom == "event" && message.room == roomId) {
+                    if (message.publishers) {
+                        callbacks.get("onPublisherAdded").then(function(callback) { callback(message.publishers) })
+                    }
+                    if (message.unpublished) {
+                        callbacks.get("onPublisherRemoved").then(function(callback) { callback(message.unpublished) })
+                    }
+                }
+            })
             return handle.sendAsyncRequest({
                 message: {
                     request: "join",
@@ -240,33 +252,16 @@ function joinVideoRoom(session, roomId) {
                 }
             })
             .then(function(response) {
-                var callbacks = {
-                    onPublisherAdded: null,
-                    onPublisherRemoved: null,
+                if (response.message.publishers.length) {
+                    callbacks.get("onPublisherAdded").then(function(callback) { callback(response.message.publishers) })
                 }
-                handle.eventTarget.addEventListener("message", function(event) {
-                    var message = event.detail.message
-                    if (message.videoroom == "event" && message.room == roomId) {
-                        if (message.publishers) {
-                            if (callbacks.onPublisherAdded) callbacks.onPublisherAdded(message.publishers)
-                            else console.warn("Unhandled publisherAdded event")
-                        }
-                        if (message.unpublished) {
-                            if (callbacks.onPublisherRemoved) callbacks.onPublisherRemoved(message.unpublished)
-                            else console.warn("Unhandled publisherRemoved event")
-                        }
-                    }
-                })
                 return {
                     pluginHandle: handle,
                     onPublisherAdded: function(callback) {
-                        if (callbacks.onPublisherAdded) throw new Error("Already registered")
-                        callbacks.onPublisherAdded = callback
-                        callbacks.onPublisherAdded(response.message.publishers)
+                        callbacks.set("onPublisherAdded", callback)
                     },
                     onPublisherRemoved: function(callback) {
-                        if (callbacks.onPublisherRemoved) throw new Error("Already registered")
-                        callbacks.onPublisherRemoved = callback
+                        callbacks.set("onPublisherRemoved", callback)
                     },
                     publish: function(options) {
                         return createVideoRoomPublisher(handle, options)
@@ -303,19 +298,9 @@ function joinVideoRoom(session, roomId) {
  * @returns {Promise<VideoRoomPublisher>}
  */
 function createVideoRoomPublisher(handle, options) {
-    var callbacks = {
-        onTrackAdded: null,
-        onTrackRemoved: null,
-    }
-    handle.eventTarget.addEventListener("localtrack", function(event) {
-        if (event.detail.added) {
-            if (callbacks.onTrackAdded) callbacks.onTrackAdded(event.detail.track)
-            else console.warn("Unhandled local trackAdded event")
-        }
-        else {
-            if (callbacks.onTrackRemoved) callbacks.onTrackRemoved(event.detail.track)
-            else console.warn("Unhandled local trackRemoved event")
-        }
+    var callbacks = makeCallbacks()
+    handle.eventTarget.addEventListener("localstream", function(event) {
+        callbacks.get("onLocalStream").then(function(callback) { callback(event.detail.stream) })
     })
     return new Promise(function(fulfill, reject) {
         handle.createOffer({
@@ -343,13 +328,8 @@ function createVideoRoomPublisher(handle, options) {
     })
     .then(function() {
         return {
-            onTrackAdded: function(callback) {
-                if (callbacks.onTrackAdded) throw new Error("Already registered")
-                callbacks.onTrackAdded = callback
-            },
-            onTrackRemoved: function(callback) {
-                if (callbacks.onTrackRemoved) throw new Error("Already registered")
-                callbacks.onTrackRemoved = callback
+            onLocalStream: function(callback) {
+                callbacks.set("onLocalStream", callback)
             },
             unpublish: function() {
                 return handle.sendAsyncRequest({
@@ -373,19 +353,9 @@ function createVideoRoomPublisher(handle, options) {
 function createVideoRoomSubscriber(session, roomId, streams) {
     return attachToPlugin(session)
         .then(function(handle) {
-            var callbacks = {
-                onTrackAdded: null,
-                onTrackRemoved: null,
-            }
-            handle.eventTarget.addEventListener("remotetrack", function(event) {
-                if (event.detail.added) {
-                    if (callbacks.onTrackAdded) callbacks.onTrackAdded(event.detail.track, event.detail.mid)
-                    else console.warn("Unhandled remote trackAdded event")
-                }
-                else {
-                    if (callbacks.onTrackRemoved) callbacks.onTrackRemoved(event.detail.track, event.detail.mid)
-                    else console.warn("Unhandled remote trackRemoved event")
-                }
+            var callbacks = makeCallbacks()
+            handle.eventTarget.addEventListener("remotestream", function(event) {
+                callbacks.get("onRemoteStream").then(function(callback) { callback(event.detail.stream) })
             })
             return handle.sendAsyncRequest({
                 message: {
@@ -399,17 +369,12 @@ function createVideoRoomSubscriber(session, roomId, streams) {
                 }
             })
             .then(function(response) {
-                return sendAnswer(response.jsep)
+                return handleOffer(response.jsep)
             })
             .then(function() {
                 return {
-                    onTrackAdded: function(callback) {
-                        if (callbacks.onTrackAdded) throw new Error("Already registered")
-                        callbacks.onTrackAdded = callback
-                    },
-                    onTrackRemoved: function(callback) {
-                        if (callbacks.onTrackRemoved) throw new Error("Already registered")
-                        callbacks.onTrackRemoved = callback
+                    onRemoteStream: function(callback) {
+                        callbacks.set("onRemoteStream", callback)
                     },
                     addStreams: function(streams) {
                         return handle.sendAsyncRequest({
@@ -419,7 +384,7 @@ function createVideoRoomSubscriber(session, roomId, streams) {
                             }
                         })
                         .then(function(response) {
-                            if (response.jsep) sendAnswer(response.jsep)
+                            if (response.jsep) handleOffer(response.jsep)
                         })
                     },
                     removeStreams: function(streams) {
@@ -430,7 +395,7 @@ function createVideoRoomSubscriber(session, roomId, streams) {
                             }
                         })
                         .then(function(response) {
-                            if (response.jsep) sendAnswer(response.jsep)
+                            if (response.jsep) handleOffer(response.jsep)
                         })
                     },
                     pause: function() {
@@ -468,24 +433,42 @@ function createVideoRoomSubscriber(session, roomId, streams) {
                     }
                 }
             })
-        })
 
-    function sendAnswer(offerJsep) {
-        return new Promise(function(fulfill, reject) {
-            handle.createAnswer({
-                jsep: offerJsep,
-                success: fulfill,
-                error: reject
-            })
+            function handleOffer(offerJsep) {
+                return new Promise(function(fulfill, reject) {
+                    handle.createAnswer({
+                        jsep: offerJsep,
+                        success: fulfill,
+                        error: reject
+                    })
+                })
+                .then(function(answerJsep) {
+                    return handle.sendAsyncRequest({
+                        message: {request: "start"},
+                        jsep: answerJsep,
+                        expectResponse: function(r) {
+                            return r.message.videoroom == "event" && r.message.started == "ok"
+                        }
+                    })
+                })
+            }
         })
-        .then(function(answerJsep) {
-            return handle.sendAsyncRequest({
-                message: {request: "start"},
-                jsep: answerJsep,
-                expectResponse: function(r) {
-                    return r.message.videoroom == "event" && r.message.started == "ok"
-                }
-            })
-        })
+}
+
+
+function makeCallbacks() {
+    var promises = {}
+    return {
+        get: function(name) {
+            if (!promises[name]) {
+                var fulfill
+                promises[name] = new Promise(function(f) { fulfill = f })
+                promises[name].fulfill = fulfill
+            }
+            return promises[name]
+        },
+        set: function(name, value) {
+            this.get(name).fulfill(value)
+        }
     }
 }
