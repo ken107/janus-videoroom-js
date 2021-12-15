@@ -20,13 +20,15 @@
 
 /**
  * @typedef {Object} VideoRoomPublisher
- * @property {(callback: (stream: MediaStream) => void) => void} onLocalStream
+ * @property {(callback: (track: MediaStreamTrack) => void) => void} onTrackAdded
+ * @property {(callback: (track: MediaStreamTrack) => void) => void} onTrackRemoved
  * @property {() => Promise<void>} unpublish
  */
 
 /**
  * @typedef {Object} VideoRoomSubscriber
- * @property {(callback: (stream: MediaStream) => void) => void} onRemoteStream
+ * @property {(callback: (track: MediaStreamTrack, mid: any) => void) => void} onTrackAdded
+ * @property {(callback: (track: MediaStreamTrack, mid: any) => void) => void} onTrackRemoved
  * @property {(streams: any[]) => Promise<void>} addStreams
  * @property {(streams: any[]) => Promise<void>} removeStreams
  * @property {() => Promise<void>} pause
@@ -153,11 +155,11 @@ function attachToPlugin(session) {
                 if (index != -1) pendingRequests.splice(index, 1)
                 else eventTarget.dispatchEvent(new CustomEvent("message", {detail: {message: message, jsep: jsep}}))
             },
-            onlocalstream: function(stream) {
-                eventTarget.dispatchEvent(new CustomEvent("localstream", {detail: {stream: stream}}))
+            onlocaltrack: function(track, added) {
+                eventTarget.dispatchEvent(new CustomEvent("localtrack", {detail: {track: track, added: added}}))
             },
-            onremotestream: function(stream) {
-                eventTarget.dispatchEvent(new CustomEvent("remotestream", {detail: {stream: stream}}))
+            onremotetrack: function(track, mid, added) {
+                eventTarget.dispatchEvent(new CustomEvent("remotetrack", {detail: {track: track, mid: mid, added: added}}))
             },
             ondataopen: function(label, protocol) {
                 eventTarget.dispatchEvent(new CustomEvent("dataopen", {detail: {label: label, protocol: protocol}}))
@@ -299,8 +301,17 @@ function joinVideoRoom(session, roomId) {
  */
 function createVideoRoomPublisher(handle, options) {
     var callbacks = makeCallbacks()
-    handle.eventTarget.addEventListener("localstream", function(event) {
-        callbacks.get("onLocalStream").then(function(callback) { callback(event.detail.stream) })
+    handle.eventTarget.addEventListener("localtrack", function(event) {
+        if (event.detail.added) {
+            callbacks.get("onTrackAdded")
+                .then(function(callback) { return callback(event.detail.track) })
+                .catch(console.error)
+        }
+        else {
+            callbacks.get("onTrackRemoved")
+                .then(function(callback) { return callback(event.detail.track) })
+                .catch(console.error)
+        }
     })
     return new Promise(function(fulfill, reject) {
         handle.createOffer({
@@ -328,8 +339,11 @@ function createVideoRoomPublisher(handle, options) {
     })
     .then(function() {
         return {
-            onLocalStream: function(callback) {
-                callbacks.set("onLocalStream", callback)
+            onTrackAdded: function(callback) {
+                callbacks.set("onTrackAdded", callback)
+            },
+            onTrackRemoved: function(callback) {
+                callbacks.set("onTrackRemoved", callback)
             },
             unpublish: function() {
                 return handle.sendAsyncRequest({
@@ -354,8 +368,17 @@ function createVideoRoomSubscriber(session, roomId, streams) {
     return attachToPlugin(session)
         .then(function(handle) {
             var callbacks = makeCallbacks()
-            handle.eventTarget.addEventListener("remotestream", function(event) {
-                callbacks.get("onRemoteStream").then(function(callback) { callback(event.detail.stream) })
+            handle.eventTarget.addEventListener("remotetrack", function(event) {
+                if (event.detail.added) {
+                    callbacks.get("onTrackAdded")
+                        .then(function(callback) { return callback(event.detail.track, event.detail.mid) })
+                        .catch(console.error)
+                }
+                else {
+                    callbacks.get("onTrackRemoved")
+                        .then(function(callback) { return callback(event.detail.track, event.detail.mid) })
+                        .catch(console.error)
+                }
             })
             return handle.sendAsyncRequest({
                 message: {
@@ -373,8 +396,11 @@ function createVideoRoomSubscriber(session, roomId, streams) {
             })
             .then(function() {
                 return {
-                    onRemoteStream: function(callback) {
-                        callbacks.set("onRemoteStream", callback)
+                    onTrackAdded: function(callback) {
+                        callbacks.set("onTrackAdded", callback)
+                    },
+                    onTrackRemoved: function(callback) {
+                        callbacks.set("onTrackRemoved", callback)
                     },
                     addStreams: function(streams) {
                         return handle.sendAsyncRequest({
@@ -415,21 +441,13 @@ function createVideoRoomSubscriber(session, roomId, streams) {
                         })
                     },
                     unsubscribe: function() {
-                        return handle.sendAsyncRequest({
-                            message: {request: "leave"},
-                            expectResponse: function(r) {
-                                return r.message.videoroom == "event" && r.message.left == "ok"
-                            }
-                        })
-                        .then(function() {
-                            return new Promise(function(fulfill, reject) {
-                                handle.detach({
-                                    success: fulfill,
-                                    error: reject
-                                })
+                        return new Promise(function(fulfill, reject) {
+                            handle.detach({
+                                success: fulfill,
+                                error: reject
                             })
-                            .catch(console.error)
                         })
+                        .catch(console.error)
                     }
                 }
             })

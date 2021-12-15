@@ -9,7 +9,8 @@ async function joinRoom(server, roomId, displayName) {
     const room = await session.joinRoom(roomId)
 
     const pub = await room.publish({display: displayName})
-    pub.onLocalStream(stream => showVideo(stream))
+    pub.onTrackAdded(track => showVideo(track))
+    pub.onTrackRemoved(track => hideVideo(track))
 
     const subs = {}
     room.onPublisherAdded(publishers => publishers.forEach(subscribe))
@@ -18,11 +19,11 @@ async function joinRoom(server, roomId, displayName) {
 
     async function subscribe(publisher) {
         subs[publisher.id] = await room.subscribe([{feed: publisher.id}])
-        subs[publisher.id].onRemoteStream(stream => subs[publisher.id].video = showVideo(stream))
+        subs[publisher.id].onTrackAdded(track => showVideo(track))
+        subs[publisher.id].onTrackRemoved(track => hideVideo(track))
     }
     async function unsubscribe(publisherId) {
         await subs[publisherId].unsubscribe()
-        subs[publisherId].video.remove()
     }
 }
 ```
@@ -55,13 +56,15 @@ Check out the [example](https://ken107.github.io/janus-videoroom-js/example.html
 ### VideoRoomPublisher
 | Property | Description |
 | -------- | ----------- |
-| onLocalStream(_callback_) | Register a callback for when the local stream is available to display |
+| onTrackAdded(_callback_) | Register a callback for when a local MediaStreamTrack is available to display |
+| onTrackRemoved(_callback_) | Register a callback for when a local MediaStreamTrack terminates |
 | unpublish() | Stop publishing |
 
 ### VideoRoomSubscriber
 | Property | Description |
 | -------- | ----------- |
-| onRemoteStream(_callback_) | Register a callback for when the remote stream is available to display |
+| onTrackAdded(_callback_) | Register a callback for when a remote MediaStreamTrack is available to display |
+| onTrackRemoved(_callback_) | Register a callback for when a remote MediaStreamTrack terminates |
 | addStreams(_streams_) | Add additional streams to this (multi-stream) subscriber |
 | removeStreams(_streams_) | Remove streams from this subscriber |
 | pause() | Pause media delivery for this subscriber |

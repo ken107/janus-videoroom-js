@@ -10,33 +10,39 @@ async function connect(server, roomId, displayName) {
     const client = await clientReady
     const session = await client.getSession(server)
     const room = await session.joinRoom(roomId)
+
     const pub = await room.publish({display: displayName})
-    pub.onLocalStream(stream => makeDisplay(displayName).update(stream))
+    const myVideo = makeDisplay(displayName)
+    pub.onTrackAdded(track => myVideo.stream.addTrack(track))
+    pub.onTrackRemoved(track => myVideo.stream.removeTrack(track))
+
     const subs = {}
     room.onPublisherAdded(publishers => publishers.forEach(subscribe))
     room.onPublisherRemoved(unsubscribe)
+
     return {room, publisher: pub, subscribers: subs}
 
 
     async function subscribe(publisher) {
-        subs[publisher.id] = await room.subscribe([{feed: publisher.id}])
-        subs[publisher.id].onRemoteStream(stream => {
-            if (!subs[publisher.id].display) subs[publisher.id].display = makeDisplay(publisher.display)
-            subs[publisher.id].display.update(stream)
-        })
+        const sub = subs[publisher.id] = await room.subscribe([{feed: publisher.id}])
+        sub.video = makeDisplay(publisher.display)
+        sub.onTrackAdded(track => sub.video.stream.addTrack(track))
+        sub.onTrackRemoved(track => sub.video.stream.removeTrack(track))
     }
     async function unsubscribe(publisherId) {
         await subs[publisherId].unsubscribe()
-        if (subs[publisherId].display) subs[publisherId].display.remove()
+        subs[publisherId].video.remove()
     }
 }
 
 
 function makeDisplay(displayName) {
+    const stream = new MediaStream()
     const $display = $("<div class='display'><div class='name'></div><video autoplay></video></div>").appendTo("#displays")
     $display.find(".name").text(displayName)
+    Janus.attachMediaStream($display.find("video").get(0), stream)
     return {
-        update: stream => Janus.attachMediaStream($display.find("video").get(0), stream),
+        stream: stream,
         remove: () => $display.remove()
     }
 }
