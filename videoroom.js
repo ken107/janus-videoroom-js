@@ -1,11 +1,13 @@
 /**
  * @typedef {Object} VideoRoomClient
- * @property {(server: string|string[]) => Promise<VideoRoomSession>} getSession
+ * @property {(server: string|string[], options?: JanusSessionOptions) => Promise<VideoRoomSession>} createSession
  */
 
 /**
  * @typedef {Object} VideoRoomSession
- * @property {(roomId: any) => Promise<VideoRoom>} joinRoom
+ * @property {() => boolean} isValid
+ * @property {(roomId: string|number) => Promise<VideoRoom>} joinRoom
+ * @property {() => Promise<JanusPluginHandleEx>} attachToPlugin
  */
 
 /**
@@ -13,8 +15,8 @@
  * @property {JanusPluginHandleEx} pluginHandle
  * @property {(callback: (publishers: any[]) => void) => void} onPublisherAdded
  * @property {(callback: (publisherId: any) => void) => void} onPublisherRemoved
- * @property {(options: any) => Promise<VideoRoomPublisher>} publish
- * @property {(streams: any[]) => Promise<VideoRoomSubscriber>} subscribe
+ * @property {(options?: {publishOptions?: JanusPublishOptions, mediaOptions?: JanusMediaOptions}) => Promise<VideoRoomPublisher>} publish
+ * @property {(streams: JanusStreamSpec[], options?: {mediaOptions?: JanusMediaOptions}) => Promise<VideoRoomSubscriber>} subscribe
  * @property {() => Promise<void>} leave
  */
 
@@ -29,8 +31,8 @@
  * @typedef {Object} VideoRoomSubscriber
  * @property {(callback: (track: MediaStreamTrack, mid: any) => void) => void} onTrackAdded
  * @property {(callback: (track: MediaStreamTrack, mid: any) => void) => void} onTrackRemoved
- * @property {(streams: any[]) => Promise<void>} addStreams
- * @property {(streams: any[]) => Promise<void>} removeStreams
+ * @property {(streams: JanusStreamSpec[]) => Promise<void>} addStreams
+ * @property {(streams: JanusStreamSpec[]) => Promise<void>} removeStreams
  * @property {() => Promise<void>} pause
  * @property {() => Promise<void>} resume
  * @property {() => Promise<void>} unsubscribe
@@ -60,29 +62,71 @@
  * @property {any} [jsep]
  */
 
+/**
+ * @typedef {Object} JanusStreamSpec
+ * @property {any} feed
+ * @property {any} [mid]
+ */
+
+/**
+ * @typedef {Object} JanusSessionOptions
+ * @property {string[]} [iceServers]
+ * @property {boolean} [ipv6]
+ * @property {boolean} [withCredentials]
+ * @property {number} [max_poll_events]
+ * @property {boolean} [destroyOnUnload]
+ * @property {any} [token]
+ * @property {string} [apisecret]
+ */
+
+/**
+ * @typedef {Object} JanusPublishOptions
+ * @property {string} [audiocodec]
+ * @property {string} [videocodec]
+ * @property {number} [bitrate]
+ * @property {boolean} [record]
+ * @property {string} [filename]
+ * @property {string} [display]
+ * @property {number} [audio_level_average]
+ * @property {number} [audio_active_packets]
+ * @property {{mid: any, description: string}[]} [descriptions]
+ */
+
+/**
+ * @typedef {Object} JanusMediaOptions
+ * @property {Object} [media]
+ * @property {boolean} [media.audioSend]
+ * @property {boolean} [media.audioRecv]
+ * @property {boolean|{deviceId: any}} [media.audio]
+ * @property {boolean} [media.videoSend]
+ * @property {boolean} [media.videoRecv]
+ * @property {string|{deviceId: any, width?: number, height?: number}} [media.video]
+ * @property {boolean} [media.data]
+ * @property {boolean} [media.failIfNoAudio]
+ * @property {boolean} [media.failIfNoVideo]
+ * @property {number} [media.screenshareFrameRate]
+ * @property {boolean} [trickle]
+ * @property {MediaStream} [stream]
+ */
+
 
 
 /**
+ * @param {Object} [options]
+ * @param {boolean|string[]} [options.debug]
+ * @param {any} [options.dependencies]
  * @returns {Promise<VideoRoomClient>}
  */
-function createVideoRoomClient() {
+function createVideoRoomClient(options) {
     return new Promise(function(fulfill) {
-        Janus.init({
-            debug: true,
-            dependencies: Janus.useDefaultDependencies(),
+        Janus.init(Object.assign({}, options, {
             callback: fulfill
-        })
+        }))
     })
     .then(function() {
-        var sessionPromises = {}
         return {
-            getSession: function(server) {
-                var key = Array.isArray(server) ? server.join(',') : server
-                return Promise.resolve(sessionPromises[key])
-                    .then(function(session) {
-                        if (session && session.isValid()) return session
-                        else return sessionPromises[key] = createVideoRoomSession(server)
-                    })
+            createSession: function(server, options) {
+                return createVideoRoomSession(server, options)
             }
         }
     })
@@ -91,12 +135,13 @@ function createVideoRoomClient() {
 
 /**
  * @param {string|string[]} server
+ * @param {JanusSessionOptions} [options]
  * @returns {Promise<VideoRoomSession>}
  */
-function createVideoRoomSession(server) {
+function createVideoRoomSession(server, options) {
     var isDestroyed = false
     return new Promise(function(fulfill, reject) {
-        var session = new Janus({
+        var session = new Janus(Object.assign({}, options, {
             server: server,
             success: function() {
                 fulfill(session)
@@ -105,7 +150,7 @@ function createVideoRoomSession(server) {
             destroyed: function() {
                 isDestroyed = true
             }
-        })
+        }))
     })
     .then(function(session) {
         return {
@@ -114,6 +159,9 @@ function createVideoRoomSession(server) {
             },
             joinRoom: function(roomId) {
                 return joinVideoRoom(session, roomId)
+            },
+            attachToPlugin: function() {
+                return attachToPlugin(session)
             }
         }
     })
@@ -225,7 +273,7 @@ function attachToPlugin(session) {
 
 /**
  * @param {JanusSession} session
- * @param {any} roomId
+ * @param {string|number} roomId
  * @returns {Promise<VideoRoom>}
  */
 function joinVideoRoom(session, roomId) {
@@ -236,10 +284,14 @@ function joinVideoRoom(session, roomId) {
                 var message = event.detail.message
                 if (message.videoroom == "event" && message.room == roomId) {
                     if (message.publishers) {
-                        callbacks.get("onPublisherAdded").then(function(callback) { callback(message.publishers) })
+                        callbacks.get("onPublisherAdded")
+                            .then(function(callback) { return callback(message.publishers) })
+                            .catch(console.error)
                     }
                     if (message.unpublished) {
-                        callbacks.get("onPublisherRemoved").then(function(callback) { callback(message.unpublished) })
+                        callbacks.get("onPublisherRemoved")
+                            .then(function(callback) { return callback(message.unpublished) })
+                            .catch(console.error)
                     }
                 }
             })
@@ -255,7 +307,9 @@ function joinVideoRoom(session, roomId) {
             })
             .then(function(response) {
                 if (response.message.publishers.length) {
-                    callbacks.get("onPublisherAdded").then(function(callback) { callback(response.message.publishers) })
+                    callbacks.get("onPublisherAdded")
+                        .then(function(callback) { return callback(response.message.publishers) })
+                        .catch(console.error)
                 }
                 return {
                     pluginHandle: handle,
@@ -268,8 +322,8 @@ function joinVideoRoom(session, roomId) {
                     publish: function(options) {
                         return createVideoRoomPublisher(handle, options)
                     },
-                    subscribe: function(streams) {
-                        return createVideoRoomSubscriber(session, roomId, streams)
+                    subscribe: function(streams, options) {
+                        return createVideoRoomSubscriber(session, roomId, streams, options)
                     },
                     leave: function() {
                         return handle.sendAsyncRequest({
@@ -296,10 +350,13 @@ function joinVideoRoom(session, roomId) {
 
 /**
  * @param {JanusPluginHandleEx} handle
- * @param {any} options
+ * @param {Object} [options]
+ * @param {JanusPublishOptions} [options.publishOptions]
+ * @param {JanusMediaOptions} [options.mediaOptions]
  * @returns {Promise<VideoRoomPublisher>}
  */
 function createVideoRoomPublisher(handle, options) {
+    options = options || {}
     var callbacks = makeCallbacks()
     handle.eventTarget.addEventListener("localtrack", function(event) {
         if (event.detail.added) {
@@ -314,14 +371,16 @@ function createVideoRoomPublisher(handle, options) {
         }
     })
     return new Promise(function(fulfill, reject) {
-        handle.createOffer({
+        handle.createOffer(Object.assign({}, options.mediaOptions, {
             success: fulfill,
             error: reject
-        })
+        }))
     })
     .then(function(offerJsep) {
         return handle.sendAsyncRequest({
-            message: Object.assign({request: "publish"}, options),
+            message: Object.assign({}, options.publishOptions, {
+                request: "publish"
+            }),
             jsep: offerJsep,
             expectResponse: function(r) {
                 return r.message.videoroom == "event" && r.message.configured == "ok"
@@ -360,11 +419,14 @@ function createVideoRoomPublisher(handle, options) {
 
 /**
  * @param {JanusSession} session
- * @param {any} roomId
- * @param {any[]} streams
+ * @param {string|number} roomId
+ * @param {JanusStreamSpec[]} streams
+ * @param {Object} [options]
+ * @param {JanusMediaOptions} [options.mediaOptions]
  * @returns {Promise<VideoRoomSubscriber>}
  */
-function createVideoRoomSubscriber(session, roomId, streams) {
+function createVideoRoomSubscriber(session, roomId, streams, options) {
+    options = options || {}
     return attachToPlugin(session)
         .then(function(handle) {
             var callbacks = makeCallbacks()
@@ -454,11 +516,11 @@ function createVideoRoomSubscriber(session, roomId, streams) {
 
             function handleOffer(offerJsep) {
                 return new Promise(function(fulfill, reject) {
-                    handle.createAnswer({
+                    handle.createAnswer(Object.assign({}, options.mediaOptions, {
                         jsep: offerJsep,
                         success: fulfill,
                         error: reject
-                    })
+                    }))
                 })
                 .then(function(answerJsep) {
                     return handle.sendAsyncRequest({

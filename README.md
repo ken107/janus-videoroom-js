@@ -5,7 +5,7 @@ A Javascript client library for working with the Janus VideoRoom plugin (built o
 ```javascript
 async function joinRoom(server, roomId, displayName) {
     const client = await createVideoRoomClient()
-    const session = await client.getSession(server)
+    const session = await client.createSession(server)
     const room = await session.joinRoom(roomId)
 
     const pub = await room.publish({display: displayName})
@@ -36,12 +36,14 @@ Check out the [example](https://ken107.github.io/janus-videoroom-js/example.html
 ### VideoRoomClient
 | Property | Description |
 | -------- | ----------- |
-| getSession(_server_) | Retrieve an existing session or create a new one |
+| createSession(_server_, _options_) | Create a new VideoRoom session |
 
 ### VideoRoomSession
 | Property | Description |
 | -------- | ----------- |
+| isValid() | Return whether the session is connected and valid |
 | joinRoom(_roomId_) | Joins a room, returns a VideoRoom object |
+| attachToPlugin() | Attach to the VideoRoom plugin without joining a room, returns a JanusPluginHandleEx object |
 
 ### VideoRoom
 | Property | Description |
@@ -50,7 +52,7 @@ Check out the [example](https://ken107.github.io/janus-videoroom-js/example.html
 | onPublisherAdded(_callback_) | Register a callback for when a publisher publishes media to the room |
 | onPublisherRemoved(_callback_) | Register a callback for when a publisher unpublishes |
 | publish(_options_) | Publish my webcam and return a VideoRoomPublisher object |
-| subscribe(_streams_) | Subscribe to the specified streams and return a VideoRoomSubscriber object |
+| subscribe(_streams_, _options_) | Subscribe to the specified streams and return a VideoRoomSubscriber object |
 | leave() | Leave the room |
 
 ### VideoRoomPublisher

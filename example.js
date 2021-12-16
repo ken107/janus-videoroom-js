@@ -8,10 +8,10 @@ const clientReady = createVideoRoomClient()
 
 async function connect(server, roomId, displayName) {
     const client = await clientReady
-    const session = await client.getSession(server)
+    const session = await client.createSession(server)
     const room = await session.joinRoom(roomId)
 
-    const pub = await room.publish({display: displayName})
+    const pub = await room.publish({publishOptions: {display: displayName}, mediaOptions: {media: {video: "lowres"}}})
     const myVideo = makeDisplay(displayName)
     pub.onTrackAdded(track => myVideo.stream.addTrack(track))
     pub.onTrackRemoved(track => myVideo.stream.removeTrack(track))
@@ -20,7 +20,7 @@ async function connect(server, roomId, displayName) {
     room.onPublisherAdded(publishers => publishers.forEach(subscribe))
     room.onPublisherRemoved(unsubscribe)
 
-    return {room, publisher: pub, subscribers: subs}
+    return {session, room, publisher: pub, subscribers: subs}
 
 
     async function subscribe(publisher) {
