@@ -60,6 +60,8 @@ Check out the [example](https://ken107.github.io/janus-videoroom-js/example.html
 | -------- | ----------- |
 | onTrackAdded(_callback_) | Register a callback for when a local MediaStreamTrack is available to display |
 | onTrackRemoved(_callback_) | Register a callback for when a local MediaStreamTrack terminates |
+| configure(_options_) | Modify publisher properties |
+| restart(_options_) | Trigger an ICE restart |
 | unpublish() | Stop publishing |
 
 ### VideoRoomSubscriber
@@ -71,6 +73,8 @@ Check out the [example](https://ken107.github.io/janus-videoroom-js/example.html
 | removeStreams(_streams_) | Remove streams from this subscriber |
 | pause() | Pause media delivery for this subscriber |
 | resume() | Resume media delivery |
+| configure(_options_) | Modify subscription properties |
+| restart(_options_) | Trigger an ICE restart |
 | unsubscribe() | Stop subscribing |
 
 ### JanusPluginHandleEx
