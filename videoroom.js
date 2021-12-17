@@ -241,7 +241,10 @@ function attachToPlugin(session) {
         })
     })
     .then(function(handle) {
+        // extend the handle to add convenience methods
         handle.eventTarget = eventTarget
+
+        // method to send a synchrnous request to the plugin
         handle.sendRequest = function(message) {
             return new Promise(function(fulfill, reject) {
                 handle.send({
@@ -251,6 +254,8 @@ function attachToPlugin(session) {
                 })
             })
         }
+
+        // method to send an asynchronous request to the plugin
         var pending = Promise.resolve()
         handle.sendAsyncRequest = function(request) {
             return pending = pending.catch(function() {})
@@ -294,9 +299,24 @@ function attachToPlugin(session) {
  * @returns {Promise<VideoRoom>}
  */
 function joinVideoRoom(session, roomId) {
+    var cleanup = makeCleanup()
+    var callbacks = makeCallbacks()
+
+    // attach to plugin and get a new handle for this room
     return attachToPlugin(session)
         .then(function(handle) {
-            var callbacks = makeCallbacks()
+
+            // remember to detach
+            cleanup.add(function() {
+                return new Promise(function(fulfill, reject) {
+                    handle.detach({
+                        success: fulfill,
+                        error: reject
+                    })
+                })
+            })
+
+            // listen to events and invoke callbacks
             handle.eventTarget.addEventListener("message", function(event) {
                 var message = event.detail.message
                 if (message.videoroom == "event" && message.room == roomId) {
@@ -312,6 +332,8 @@ function joinVideoRoom(session, roomId) {
                     }
                 }
             })
+
+            // send the join request
             return handle.sendAsyncRequest({
                 message: {
                     request: "join",
@@ -323,12 +345,26 @@ function joinVideoRoom(session, roomId) {
                 }
             })
             .then(function(response) {
+                // remember to leave
+                cleanup.add(function() {
+                    return handle.sendAsyncRequest({
+                        message: {request: "leave"},
+                        expectResponse: function(r) {
+                            return r.message.videoroom == "event" && r.message.leaving == "ok"
+                        }
+                    })
+                })
+
+                // invoke callback with the initial list of publishers
                 if (response.message.publishers.length) {
                     callbacks.get("onPublisherAdded")
                         .then(function(callback) { return callback(response.message.publishers) })
                         .catch(console.error)
                 }
-                return {
+
+                // construct and return the VideoRoom object
+                /** @type {VideoRoom} */
+                var room = {
                     pluginHandle: handle,
                     onPublisherAdded: function(callback) {
                         callbacks.set("onPublisherAdded", callback)
@@ -343,24 +379,15 @@ function joinVideoRoom(session, roomId) {
                         return createVideoRoomSubscriber(session, roomId, streams, options)
                     },
                     leave: function() {
-                        return handle.sendAsyncRequest({
-                            message: {request: "leave"},
-                            expectResponse: function(r) {
-                                return r.message.videoroom == "event" && r.message.leaving == "ok"
-                            }
-                        })
-                        .then(function() {
-                            return new Promise(function(fulfill, reject) {
-                                handle.detach({
-                                    success: fulfill,
-                                    error: reject
-                                })
-                            })
-                            .catch(console.error)
-                        })
+                        return cleanup.run()
                     }
                 }
+                return room
             })
+        })
+        .catch(function(err) {
+            return cleanup.run().catch(console.error)
+                .then(function() { throw err })
         })
 }
 
@@ -374,8 +401,11 @@ function joinVideoRoom(session, roomId) {
  */
 function createVideoRoomPublisher(handle, options) {
     options = Object.assign({}, options)
+    var cleanup = makeCleanup()
     var callbacks = makeCallbacks()
-    handle.eventTarget.addEventListener("localtrack", function(event) {
+
+    // listen to events and invoke callbacks
+    var onLocalTrack = function(event) {
         if (event.detail.added) {
             callbacks.get("onTrackAdded")
                 .then(function(callback) { return callback(event.detail.track) })
@@ -386,7 +416,15 @@ function createVideoRoomPublisher(handle, options) {
                 .then(function(callback) { return callback(event.detail.track) })
                 .catch(console.error)
         }
+    }
+    handle.eventTarget.addEventListener("localtrack", onLocalTrack)
+
+    // remember to remove the event listener
+    cleanup.add(function() {
+        handle.eventTarget.removeEventListener("localtrack", onLocalTrack)
     })
+
+    // send the publish request
     return new Promise(function(fulfill, reject) {
         handle.createOffer(Object.assign({}, options.mediaOptions, {
             success: fulfill,
@@ -405,6 +443,17 @@ function createVideoRoomPublisher(handle, options) {
         })
     })
     .then(function(response) {
+        // remember to unpublish
+        cleanup.add(function() {
+            return handle.sendAsyncRequest({
+                message: {request: "unpublish"},
+                expectResponse: function(r) {
+                    return r.message.videoroom == "event" && r.message.unpublished == "ok"
+                }
+            })
+        })
+
+        // handle the answer JSEP
         return new Promise(function(fulfill, reject) {
             handle.handleRemoteJsep({
                 jsep: response.jsep,
@@ -414,7 +463,9 @@ function createVideoRoomPublisher(handle, options) {
         })
     })
     .then(function() {
-        return {
+        // construct and return the VideoRoomPublisher object
+        /** @type {VideoRoomPublisher} */
+        var pub = {
             onTrackAdded: function(callback) {
                 callbacks.set("onTrackAdded", callback)
             },
@@ -463,14 +514,14 @@ function createVideoRoomPublisher(handle, options) {
                 })
             },
             unpublish: function() {
-                return handle.sendAsyncRequest({
-                    message: {request: "unpublish"},
-                    expectResponse: function(r) {
-                        return r.message.videoroom == "event" && r.message.unpublished == "ok"
-                    }
-                })
+                return cleanup.run()
             }
         }
+        return pub
+    })
+    .catch(function(err) {
+        return cleanup.run().catch(console.error)
+            .then(function() { throw err })
     })
 }
 
@@ -485,9 +536,24 @@ function createVideoRoomPublisher(handle, options) {
  */
 function createVideoRoomSubscriber(session, roomId, streams, options) {
     options = Object.assign({}, options)
+    var cleanup = makeCleanup()
+    var callbacks = makeCallbacks()
+
+    // attach to plugin and get a separate handle for this subscriber
     return attachToPlugin(session)
         .then(function(handle) {
-            var callbacks = makeCallbacks()
+
+            // remember to detach
+            cleanup.add(function() {
+                return new Promise(function(fulfill, reject) {
+                    handle.detach({
+                        success: fulfill,
+                        error: reject
+                    })
+                })
+            })
+
+            // listen to events and invoke callbacks
             handle.eventTarget.addEventListener("remotetrack", function(event) {
                 if (event.detail.added) {
                     callbacks.get("onTrackAdded")
@@ -500,6 +566,8 @@ function createVideoRoomSubscriber(session, roomId, streams, options) {
                         .catch(console.error)
                 }
             })
+
+            // join the room as a subscriber
             return handle.sendAsyncRequest({
                 message: {
                     request: "join",
@@ -512,10 +580,12 @@ function createVideoRoomSubscriber(session, roomId, streams, options) {
                 }
             })
             .then(function(response) {
-                return handleOffer(response.jsep, options.mediaOptions)
+                return handleOffer(handle, response.jsep, options.mediaOptions)
             })
             .then(function() {
-                return {
+                // construct and return the VideoRoomSubscriber object
+                /** @type {VideoRoomSubscriber} */
+                var sub = {
                     onTrackAdded: function(callback) {
                         callbacks.set("onTrackAdded", callback)
                     },
@@ -530,7 +600,7 @@ function createVideoRoomSubscriber(session, roomId, streams, options) {
                             }
                         })
                         .then(function(response) {
-                            if (response.jsep) return handleOffer(response.jsep, options.mediaOptions)
+                            if (response.jsep) return handleOffer(handle, response.jsep, options.mediaOptions)
                         })
                     },
                     removeStreams: function(streams) {
@@ -541,7 +611,7 @@ function createVideoRoomSubscriber(session, roomId, streams, options) {
                             }
                         })
                         .then(function(response) {
-                            if (response.jsep) return handleOffer(response.jsep, options.mediaOptions)
+                            if (response.jsep) return handleOffer(handle, response.jsep, options.mediaOptions)
                         })
                     },
                     pause: function() {
@@ -582,50 +652,65 @@ function createVideoRoomSubscriber(session, roomId, streams, options) {
                             }
                         })
                         .then(function(response) {
-                            return handleOffer(response.jsep, mediaOptions)
+                            return handleOffer(handle, response.jsep, mediaOptions)
                         })
                         .then(function() {
                             options.mediaOptions = mediaOptions
                         })
                     },
                     unsubscribe: function() {
-                        return new Promise(function(fulfill, reject) {
-                            handle.detach({
-                                success: fulfill,
-                                error: reject
-                            })
-                        })
-                        .catch(console.error)
+                        return cleanup.run()
                     }
                 }
+                return sub
             })
-
-            /**
-             * @param {any} offerJsep
-             * @param {JanusMediaOptions} mediaOptions
-             * @returns Promise<void>
-             */
-            function handleOffer(offerJsep, mediaOptions) {
-                return new Promise(function(fulfill, reject) {
-                    handle.createAnswer(Object.assign({}, mediaOptions, {
-                        jsep: offerJsep,
-                        success: fulfill,
-                        error: reject
-                    }))
-                })
-                .then(function(answerJsep) {
-                    return handle.sendAsyncRequest({
-                        message: {request: "start"},
-                        jsep: answerJsep,
-                        expectResponse: function(r) {
-                            return r.message.videoroom == "event" && r.message.started == "ok"
-                        }
-                    })
-                })
-            }
+        })
+        .catch(function(err) {
+            return cleanup.run().catch(console.error)
+                .then(function() { throw err })
         })
 }
 
+
+/**
+ * @param {JanusPluginHandleEx} handle
+ * @param {any} offerJsep
+ * @param {JanusMediaOptions} mediaOptions
+ * @returns Promise<void>
+ */
+function handleOffer(handle, offerJsep, mediaOptions) {
+    return new Promise(function(fulfill, reject) {
+        handle.createAnswer(Object.assign({}, mediaOptions, {
+            jsep: offerJsep,
+            success: fulfill,
+            error: reject
+        }))
+    })
+    .then(function(answerJsep) {
+        return handle.sendAsyncRequest({
+            message: {request: "start"},
+            jsep: answerJsep,
+            expectResponse: function(r) {
+                return r.message.videoroom == "event" && r.message.started == "ok"
+            }
+        })
+    })
+}
+
+
+function makeCleanup() {
+    var tasks = []
+    return {
+        add: function(task) {
+            tasks.push(task)
+        },
+        run: function() {
+            var promise = Promise.resolve()
+            for (var i=tasks.length-1; i>=0; i--) promise = promise.then(tasks[i])
+            return promise
+        }
+    }
+}
 
 function makeCallbacks() {
     var promises = {}

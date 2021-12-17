@@ -34,11 +34,13 @@ Check out the [example](https://ken107.github.io/janus-videoroom-js/example.html
 ## API
 
 ### VideoRoomClient
+
 | Property | Description |
 | -------- | ----------- |
 | createSession(_server_, _options_) | Create a new VideoRoom session |
 
 ### VideoRoomSession
+
 | Property | Description |
 | -------- | ----------- |
 | isValid() | Return whether the session is connected and valid |
@@ -46,6 +48,7 @@ Check out the [example](https://ken107.github.io/janus-videoroom-js/example.html
 | attachToPlugin() | Attach to the VideoRoom plugin without joining a room, returns a JanusPluginHandleEx object |
 
 ### VideoRoom
+
 | Property | Description |
 | -------- | ----------- |
 | pluginHandle | The JanusPluginHandleEx object associated with this room |
@@ -56,6 +59,7 @@ Check out the [example](https://ken107.github.io/janus-videoroom-js/example.html
 | leave() | Leave the room |
 
 ### VideoRoomPublisher
+
 | Property | Description |
 | -------- | ----------- |
 | onTrackAdded(_callback_) | Register a callback for when a local MediaStreamTrack is available to display |
@@ -65,6 +69,7 @@ Check out the [example](https://ken107.github.io/janus-videoroom-js/example.html
 | unpublish() | Stop publishing |
 
 ### VideoRoomSubscriber
+
 | Property | Description |
 | -------- | ----------- |
 | onTrackAdded(_callback_) | Register a callback for when a remote MediaStreamTrack is available to display |

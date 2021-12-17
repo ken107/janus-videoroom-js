@@ -3,7 +3,7 @@
  */
 
 /** @type {Promise<VideoRoomClient>} */
-const clientReady = createVideoRoomClient()
+const clientReady = createVideoRoomClient({debug: true})
 
 
 async function connect(server, roomId, displayName) {
