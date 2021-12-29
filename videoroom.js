@@ -191,7 +191,7 @@ function createVideoRoomSession(server, options) {
  */
 function attachToPlugin(session) {
     var pendingRequests = []
-    var eventTarget = new EventTarget()
+    var eventTarget = makeEventTarget()
     return new Promise(function(fulfill, reject) {
         session.attach({
             plugin: "janus.plugin.videoroom",
@@ -725,6 +725,27 @@ function makeCallbacks() {
         },
         set: function(name, value) {
             this.get(name).fulfill(value)
+        }
+    }
+}
+
+function makeEventTarget() {
+    var listeners = {}
+    return {
+        addEventListener: function(name, callback) {
+            if (!listeners[name]) listeners[name] = []
+            listeners[name].push(callback)
+        },
+        removeEventListener: function(name, callback) {
+            if (!listeners[name]) return
+            var index = listeners[name].indexOf(callback)
+            if (index >= 0) listeners[name].splice(index, 1)
+        },
+        dispatchEvent: function(event) {
+            if (!listeners[event.type]) return
+            for (var i=0; i<listeners[event.type].length; i++) {
+                listeners[event.type][i](event)
+            }
         }
     }
 }
