@@ -12,6 +12,7 @@
 
 /**
  * @typedef {Object} VideoRoom
+ * @property {string|number} roomId
  * @property {JanusPluginHandleEx} pluginHandle
  * @property {(callback: (publishers: any[]) => void) => void} onPublisherAdded
  * @property {(callback: (publisherId: any) => void) => void} onPublisherRemoved
@@ -22,6 +23,7 @@
 
 /**
  * @typedef {Object} VideoRoomPublisher
+ * @property {string|number} publisherId
  * @property {(callback: (track: MediaStreamTrack) => void) => void} onTrackAdded
  * @property {(callback: (track: MediaStreamTrack) => void) => void} onTrackRemoved
  * @property {(configureOptions: JanusPublishOptions) => Promise<void>} configure
@@ -365,6 +367,7 @@ function joinVideoRoom(session, roomId) {
                 // construct and return the VideoRoom object
                 /** @type {VideoRoom} */
                 var room = {
+                    roomId: roomId,
                     pluginHandle: handle,
                     onPublisherAdded: function(callback) {
                         callbacks.set("onPublisherAdded", callback)
@@ -373,7 +376,7 @@ function joinVideoRoom(session, roomId) {
                         callbacks.set("onPublisherRemoved", callback)
                     },
                     publish: function(options) {
-                        return createVideoRoomPublisher(handle, options)
+                        return createVideoRoomPublisher(handle, response.message.id, options)
                     },
                     subscribe: function(streams, options) {
                         return createVideoRoomSubscriber(session, roomId, streams, options)
@@ -394,12 +397,13 @@ function joinVideoRoom(session, roomId) {
 
 /**
  * @param {JanusPluginHandleEx} handle
+ * @param {string|number} publisherId
  * @param {Object} [options]
  * @param {JanusPublishOptions} [options.publishOptions]
  * @param {JanusMediaOptions} [options.mediaOptions]
  * @returns {Promise<VideoRoomPublisher>}
  */
-function createVideoRoomPublisher(handle, options) {
+function createVideoRoomPublisher(handle, publisherId, options) {
     options = Object.assign({}, options)
     var cleanup = makeCleanup()
     var callbacks = makeCallbacks()
@@ -466,6 +470,7 @@ function createVideoRoomPublisher(handle, options) {
         // construct and return the VideoRoomPublisher object
         /** @type {VideoRoomPublisher} */
         var pub = {
+            publisherId: publisherId,
             onTrackAdded: function(callback) {
                 callbacks.set("onTrackAdded", callback)
             },
