@@ -7,6 +7,7 @@
  * @typedef {Object} VideoRoomSession
  * @property {() => boolean} isValid
  * @property {(roomId: string|number) => Promise<VideoRoom>} joinRoom
+ * @property {(roomId: string|number, streams: JanusStreamSpec[], options?: {mediaOptions?: JanusMediaOptions}) => Promise<VideoRoomSubscriber>} subscribe
  * @property {() => Promise<JanusPluginHandleEx>} attachToPlugin
  */
 
@@ -178,6 +179,9 @@ function createVideoRoomSession(server, options) {
             },
             joinRoom: function(roomId) {
                 return joinVideoRoom(session, roomId)
+            },
+            subscribe: function(roomId, streams, options) {
+                return createVideoRoomSubscriber(session, roomId, streams, options)
             },
             attachToPlugin: function() {
                 return attachToPlugin(session)
