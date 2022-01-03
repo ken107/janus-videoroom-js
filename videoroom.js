@@ -114,6 +114,7 @@
  * @property {number} [media.screenshareFrameRate]
  * @property {boolean} [trickle]
  * @property {MediaStream} [stream]
+ * @property {(jsep: {sdp: any}) => void} [customizeSdp]
  */
 
 /**
@@ -690,6 +691,7 @@ function createVideoRoomSubscriber(session, roomId, streams, options) {
 function handleOffer(handle, offerJsep, mediaOptions) {
     return new Promise(function(fulfill, reject) {
         handle.createAnswer(Object.assign({}, mediaOptions, {
+            media: Object.assign({audioSend: false, videoSend: false}, mediaOptions && mediaOptions.media),
             jsep: offerJsep,
             success: fulfill,
             error: reject
