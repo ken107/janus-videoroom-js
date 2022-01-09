@@ -59,14 +59,19 @@
 
 /**
  * @callback SendAsyncRequest
- * @param {{message: any, jsep?: any, expectResponse: (response: AsyncResponse) => boolean}} options
+ * @param {{message: any, jsep?: Jsep, expectResponse: (response: AsyncResponse) => boolean}} options
  * @returns {Promise<AsyncResponse>}
  */
 
 /**
  * @typedef {Object} AsyncResponse
  * @property {any} message
- * @property {any} [jsep]
+ * @property {Jsep} [jsep]
+ */
+
+/**
+ * @typedef {Object} Jsep
+ * @property {string} sdp
  */
 
 /**
@@ -114,7 +119,8 @@
  * @property {number} [media.screenshareFrameRate]
  * @property {boolean} [trickle]
  * @property {MediaStream} [stream]
- * @property {(jsep: {sdp: any}) => void} [customizeSdp]
+ * @property {(jsep: Jsep) => void} [customizeSdp]
+ * @property {(jsep: Jsep) => void} [customizeRemoteSdp]
  */
 
 /**
@@ -435,6 +441,7 @@ function createVideoRoomPublisher(handle, publisherId, options) {
 
     // send the publish request
     return new Promise(function(fulfill, reject) {
+        // the offer (local) sdp can be customized via mediaOptions.customizeSdp
         handle.createOffer(Object.assign({}, options.mediaOptions, {
             success: fulfill,
             error: reject
@@ -467,7 +474,8 @@ function createVideoRoomPublisher(handle, publisherId, options) {
             handle.handleRemoteJsep({
                 jsep: response.jsep,
                 success: fulfill,
-                error: reject
+                error: reject,
+                customizeSdp: options.mediaOptions && options.mediaOptions.customizeRemoteSdp
             })
         })
     })
@@ -684,12 +692,19 @@ function createVideoRoomSubscriber(session, roomId, streams, options) {
 
 /**
  * @param {JanusPluginHandleEx} handle
- * @param {any} offerJsep
+ * @param {Jsep} offerJsep
  * @param {JanusMediaOptions} mediaOptions
  * @returns Promise<void>
  */
 function handleOffer(handle, offerJsep, mediaOptions) {
+    // allow customizing the remote (offer) sdp
+    if (mediaOptions && mediaOptions.customizeRemoteSdp) {
+        mediaOptions.customizeRemoteSdp(offerJsep)
+    }
+
+    // create and send the answer
     return new Promise(function(fulfill, reject) {
+        // the answer (local) sdp can be customized via mediaOptions.customizeSdp
         handle.createAnswer(Object.assign({}, mediaOptions, {
             media: Object.assign({audioSend: false, videoSend: false}, mediaOptions && mediaOptions.media),
             jsep: offerJsep,
