@@ -358,16 +358,6 @@ function joinVideoRoom(session, roomId) {
                 }
             })
             .then(function(response) {
-                // remember to leave
-                cleanup.add(function() {
-                    return handle.sendAsyncRequest({
-                        message: {request: "leave"},
-                        expectResponse: function(r) {
-                            return r.message.videoroom == "event" && r.message.leaving == "ok"
-                        }
-                    })
-                })
-
                 // invoke callback with the initial list of publishers
                 if (response.message.publishers.length) {
                     callbacks.get("onPublisherAdded")
