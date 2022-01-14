@@ -166,23 +166,43 @@ function createVideoRoomClient(options) {
  * @returns {Promise<VideoRoomSession>}
  */
 function createVideoRoomSession(server, options) {
-    var isDestroyed = false
+    var callbacks = makeCallbacks()
     return new Promise(function(fulfill, reject) {
+        var resolved = false
         var session = new Janus(Object.assign({}, options, {
             server: server,
             success: function() {
-                fulfill(session)
+                if (!resolved) {
+                    fulfill(session)
+                    resolved = true
+                }
+                else {
+                    //reconnected
+                }
             },
-            error: reject,
-            destroyed: function() {
-                isDestroyed = true
-            }
+            error: function(err) {
+                if (!resolved) {
+                    reject(err)
+                    resolved = true
+                }
+                else if (typeof err == "string" && err.startsWith("Lost connection")) {
+                    callbacks.get("onConnectionLost")
+                        .then(function(callback) { return callback() })
+                        .catch(console.error)
+                }
+                else {
+                    console.error(err)
+                }
+            },
         }))
     })
     .then(function(session) {
         return {
             isValid: function() {
-                return !isDestroyed
+                return session.isConnected()
+            },
+            onConnectionLost: function(callback) {
+                callbacks.set("onConnectionLost", callback)
             },
             joinRoom: function(roomId) {
                 return joinVideoRoom(session, roomId)
