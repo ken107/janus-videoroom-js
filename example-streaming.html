@@ -1,0 +1,45 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="utf-8">
+    <meta http-equiv="X-UA-Compatible" content="IE=edge">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Streaming Example</title>
+
+    <script src="https://webrtc.github.io/adapter/adapter-latest.js"></script>
+    <script src="https://ajax.googleapis.com/ajax/libs/jquery/3.6.0/jquery.min.js"></script>
+    <script src="https://janus.conf.meetecho.com/janus.js"></script>
+    <script src="./videoroom.js"></script>
+    <script>
+        const clientReady = createVideoRoomClient({debug: true})
+
+        async function connect(server, mountPointId) {
+            const client = await clientReady
+            const session = await client.createSession(server)
+            const sub = await session.watch(mountPointId)
+            const stream = new MediaStream()
+            sub.onTrackAdded(track => stream.addTrack(track))
+            sub.onTrackRemoved(track => stream.removeTrack(track))
+            $("#display").get(0).srcObject = stream
+        }
+
+        $(function() {
+            $("#main-form").submit(function() {
+                connect(this.server.value, Number(this.mountPointId.value))
+                    .then(() => $(this).hide())
+                    .catch(console.error)
+                return false
+            })
+        })
+    </script>
+</head>
+<body>
+    <form id="main-form">
+        <input type="text" name="server" value="wss://janus.conf.meetecho.com/ws" placeholder="Server" required>
+        <input type="number" name="mountPointId" value="1" placeholder="ID of mount point" required>
+        <button type="submit">Watch</button>
+    </form>
+
+    <video autoplay id="display"></video>
+</body>
+</html>

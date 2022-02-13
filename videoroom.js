@@ -8,7 +8,8 @@
  * @property {() => boolean} isValid
  * @property {(roomId: string|number) => Promise<VideoRoom>} joinRoom
  * @property {(roomId: string|number, streams: JanusStreamSpec[], options?: {mediaOptions?: JanusMediaOptions}) => Promise<VideoRoomSubscriber>} subscribe
- * @property {() => Promise<JanusPluginHandleEx>} attachToPlugin
+ * @property {(mountPointId: number, options?: {watchOptions?: JanusWatchOptions, mediaOptions?: JanusMediaOptions}) => Promise<StreamingSubscriber>} watch
+ * @property {(plugin: string) => Promise<JanusPluginHandleEx>} attachToPlugin
  */
 
 /**
@@ -42,6 +43,18 @@
  * @property {() => Promise<void>} resume
  * @property {(configureOptions: JanusSubscriberConfigureOptions) => Promise<void>} configure
  * @property {(mediaOptions: JanusMediaOptions) => Promise<void>} restart
+ * @property {() => Promise<void>} unsubscribe
+ */
+
+/**
+ * @typedef {Object} StreamingSubscriber
+ * @property {(callback: (track: MediaStreamTrack, mid: any) => void) => void} onTrackAdded
+ * @property {(callback: (track: MediaStreamTrack, mid: any) => void) => void} onTrackRemoved
+ * @property {() => Promise<void>} pause
+ * @property {() => Promise<void>} resume
+ * @property {(configureOptions: JanusSubscriberConfigureOptions) => Promise<void>} configure
+ * @property {(mountPointId: number) => Promise<void>} switch
+ * @property {(options?: {watchOptions?: JanusWatchOptions, mediaOptions?: JanusMediaOptions}) => Promise<void>} restart
  * @property {() => Promise<void>} unsubscribe
  */
 
@@ -102,6 +115,12 @@
  * @property {number} [audio_level_average]
  * @property {number} [audio_active_packets]
  * @property {{mid: any, description: string}[]} [descriptions]
+ */
+
+/**
+ * @typedef {Object} JanusWatchOptions
+ * @property {string} [pin]
+ * @property {string[]} [media]
  */
 
 /**
@@ -195,7 +214,8 @@ function createVideoRoomSession(server, options) {
         }))
     })
     .then(function(session) {
-        return {
+        /** @type {VideoRoomSession} */
+        var ses = {
             eventTarget: eventTarget,
             isValid: function() {
                 return session.isConnected()
@@ -206,10 +226,14 @@ function createVideoRoomSession(server, options) {
             subscribe: function(roomId, streams, options) {
                 return createVideoRoomSubscriber(session, roomId, streams, options)
             },
-            attachToPlugin: function() {
-                return attachToPlugin(session)
+            watch: function(mountPointId, options) {
+                return createStreamingSubscriber(session, mountPointId, options)
+            },
+            attachToPlugin: function(plugin) {
+                return attachToPlugin(session, plugin)
             }
         }
+        return ses
     })
 }
 
@@ -218,12 +242,12 @@ function createVideoRoomSession(server, options) {
  * @param {JanusSession} session
  * @returns {Promise<JanusPluginHandleEx>}
  */
-function attachToPlugin(session) {
+function attachToPlugin(session, plugin) {
     var pendingRequests = []
     var eventTarget = makeEventTarget()
     return new Promise(function(fulfill, reject) {
         session.attach({
-            plugin: "janus.plugin.videoroom",
+            plugin: plugin,
             success: fulfill,
             error: reject,
             consentDialog: function(state) {
@@ -301,7 +325,7 @@ function attachToPlugin(session) {
                         return new Promise(function(fulfill, reject) {
                             pendingRequests.push({
                                 acceptResponse: function(response) {
-                                    if (response.message.videoroom == "event" && response.message.error_code) {
+                                    if ((response.message.videoroom == "event" || response.message.streaming == "event") && response.message.error_code) {
                                         var err = new Error(response.message.error || response.message.error_code)
                                         err.code = response.message.error_code
                                         reject(err)
@@ -332,7 +356,7 @@ function joinVideoRoom(session, roomId) {
     var callbacks = makeCallbacks()
 
     // attach to plugin and get a new handle for this room
-    return attachToPlugin(session)
+    return attachToPlugin(session, "janus.plugin.videoroom")
         .then(function(handle) {
 
             // remember to detach
@@ -564,7 +588,7 @@ function createVideoRoomSubscriber(session, roomId, streams, options) {
     var callbacks = makeCallbacks()
 
     // attach to plugin and get a separate handle for this subscriber
-    return attachToPlugin(session)
+    return attachToPlugin(session, "janus.plugin.videoroom")
         .then(function(handle) {
 
             // remember to detach
@@ -697,10 +721,146 @@ function createVideoRoomSubscriber(session, roomId, streams, options) {
 
 
 /**
+ * @param {JanusSession} session
+ * @param {number} mountPointId
+ * @param {Object} [options]
+ * @param {JanusWatchOptions} [options.watchOptions]
+ * @param {JanusMediaOptions} [options.mediaOptions]
+ * @returns {Promise<StreamingSubscriber>}
+ */
+function createStreamingSubscriber(session, mountPointId, options) {
+    options = Object.assign({}, options)
+    var cleanup = makeCleanup()
+    var callbacks = makeCallbacks()
+
+    // attach to the streaming plugin
+    return attachToPlugin(session, "janus.plugin.streaming")
+        .then(function(handle) {
+
+            // remember to detach
+            cleanup.add(function() {
+                return new Promise(function(fulfill, reject) {
+                    handle.detach({
+                        success: fulfill,
+                        error: reject
+                    })
+                })
+            })
+
+            // listen to events and invoke callbacks
+            handle.eventTarget.addEventListener("remotetrack", function(event) {
+                if (event.detail.added) {
+                    callbacks.get("onTrackAdded")
+                        .then(function(callback) { return callback(event.detail.track, event.detail.mid) })
+                        .catch(console.error)
+                }
+                else {
+                    callbacks.get("onTrackRemoved")
+                        .then(function(callback) { return callback(event.detail.track, event.detail.mid) })
+                        .catch(console.error)
+                }
+            })
+
+            // send the watch request
+            return handle.sendAsyncRequest({
+                message: Object.assign({}, options.watchOptions, {
+                    request: "watch",
+                    id: mountPointId
+                }),
+                expectResponse: function(r) {
+                    return r.message.streaming == "event" && r.message.result && r.message.result.status == "preparing"
+                }
+            })
+            .then(function(response) {
+                return handleOffer(handle, response.jsep, options.mediaOptions)
+            })
+            .then(function() {
+                // construct and return the StreamingSubscriber object
+                /** @type {StreamingSubscriber} */
+                var sub = {
+                    onTrackAdded: function(callback) {
+                        callbacks.set("onTrackAdded", callback)
+                    },
+                    onTrackRemoved: function(callback) {
+                        callbacks.set("onTrackRemoved", callback)
+                    },
+                    pause: function() {
+                        return handle.sendAsyncRequest({
+                            message: {request: "pause"},
+                            expectResponse: function(r) {
+                                return r.message.streaming == "event" && r.message.result && r.message.result.status == "pausing"
+                            }
+                        })
+                    },
+                    resume: function() {
+                        return handle.sendAsyncRequest({
+                            message: {request: "start"},
+                            expectResponse: function(r) {
+                                return r.message.streaming == "event" && r.message.result && r.message.result.status == "starting"
+                            }
+                        })
+                    },
+                    configure: function(configureOptions) {
+                        return handle.sendAsyncRequest({
+                            message: Object.assign({}, configureOptions, {
+                                request: "configure"
+                            }),
+                            expectResponse: function(r) {
+                                return r.message.streaming == "event" && r.message.result && r.message.result.event == "configured"
+                            }
+                        })
+                    },
+                    switch: function(newMountPointId) {
+                        return handle.sendAsyncRequest({
+                            message: {
+                                request: "switch",
+                                id: newMountPointId
+                            },
+                            expectResponse: function(r) {
+                                return r.message.streaming == "event" && r.message.result && r.message.result.switched == "ok"
+                            }
+                        })
+                        .then(function() {
+                            mountPointId = newMountPointId
+                        })
+                    },
+                    restart: function(newOptions) {
+                        newOptions = Object.assign({}, newOptions)
+                        return handle.sendAsyncRequest({
+                            message: Object.assign({}, newOptions.watchOptions, {
+                                request: "watch",
+                                id: mountPointId
+                            }),
+                            expectResponse: function(r) {
+                                return r.message.streaming == "event" && r.message.result && r.message.result.status == "preparing"
+                            }
+                        })
+                        .then(function(response) {
+                            return handleOffer(handle, response.jsep, newOptions.mediaOptions)
+                        })
+                        .then(function() {
+                            options = newOptions
+                        })
+                    },
+                    unsubscribe: function() {
+                        return cleanup.run()
+                    }
+                }
+                return sub
+            })
+        })
+        .catch(function(err) {
+            return cleanup.run().catch(console.error)
+                .then(function() { throw err })
+        })
+}
+
+
+/**
  * @param {JanusPluginHandleEx} handle
  * @param {Jsep} offerJsep
  * @param {JanusMediaOptions} mediaOptions
- * @returns Promise<void>
+ * @returns {Promise<void>}
  */
 function handleOffer(handle, offerJsep, mediaOptions) {
     // allow customizing the remote (offer) sdp
@@ -723,7 +883,8 @@ function handleOffer(handle, offerJsep, mediaOptions) {
             message: {request: "start"},
             jsep: answerJsep,
             expectResponse: function(r) {
-                return r.message.videoroom == "event" && r.message.started == "ok"
+                return r.message.videoroom == "event" && r.message.started == "ok" ||
+                    r.message.streaming == "event" && r.message.result && r.message.result.status == "starting"
             }
         })
     })
