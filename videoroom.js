@@ -10,6 +10,7 @@
  * @property {(roomId: string|number, streams: JanusStreamSpec[], options?: {mediaOptions?: JanusMediaOptions}) => Promise<VideoRoomSubscriber>} subscribe
  * @property {(mountPointId: number, options?: {watchOptions?: JanusWatchOptions, mediaOptions?: JanusMediaOptions}) => Promise<StreamingSubscriber>} watch
  * @property {(plugin: string) => Promise<JanusPluginHandleEx>} attachToPlugin
+ * @property {() => Promise<void>} destroy
  */
 
 /**
@@ -231,6 +232,14 @@ function createVideoRoomSession(server, options) {
             },
             attachToPlugin: function(plugin) {
                 return attachToPlugin(session, plugin)
+            },
+            destroy: function() {
+                return new Promise(function(fulfill, reject) {
+                    session.destroy({
+                        success: fulfill,
+                        error: reject
+                    })
+                })
             }
         }
         return ses
