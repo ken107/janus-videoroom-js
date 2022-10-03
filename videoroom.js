@@ -126,21 +126,26 @@
 
 /**
  * @typedef {Object} JanusMediaOptions
- * @property {Object} [media]
- * @property {boolean} [media.audioSend]
- * @property {boolean} [media.audioRecv]
- * @property {boolean|{deviceId: any}} [media.audio]
- * @property {boolean} [media.videoSend]
- * @property {boolean} [media.videoRecv]
- * @property {string|{deviceId: any, width?: number, height?: number}} [media.video]
- * @property {boolean} [media.data]
- * @property {boolean} [media.failIfNoAudio]
- * @property {boolean} [media.failIfNoVideo]
- * @property {number} [media.screenshareFrameRate]
+ * @property {JanusTrackSpec[]} [tracks]
  * @property {boolean} [trickle]
  * @property {MediaStream} [stream]
  * @property {(jsep: Jsep) => void} [customizeSdp]
  * @property {(jsep: Jsep) => void} [customizeRemoteSdp]
+ */
+
+/**
+ * @typedef {Object} JanusTrackSpec
+ * @property {string} type
+ * @property {any} [mid]
+ * @property {boolean|string|{deviceId: any, width?: number, height?: number}} [capture]
+ * @property {boolean} [simulcast]
+ * @property {any} [svc]
+ * @property {boolean} [recv]
+ * @property {boolean} [add]
+ * @property {boolean} [replace]
+ * @property {boolean} [remove]
+ * @property {boolean} [dontStop]
+ * @property {any} [transforms]
  */
 
 /**
@@ -881,7 +886,6 @@ function handleOffer(handle, offerJsep, mediaOptions) {
     return new Promise(function(fulfill, reject) {
         // the answer (local) sdp can be customized via mediaOptions.customizeSdp
         handle.createAnswer(Object.assign({}, mediaOptions, {
-            media: Object.assign({audioSend: false, videoSend: false}, mediaOptions && mediaOptions.media),
             jsep: offerJsep,
             success: fulfill,
             error: reject
