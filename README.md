@@ -1,5 +1,5 @@
-# janus-videoroom-js
-A Javascript client library for working with the Janus VideoRoom plugin (built on top of janus.js)
+# janus-simple-videoroom-client
+Built on top of janus.js, this thin client library provides a simple API that makes it easy to work with the Janus VideoRoom plugin.
 
 ## Usage
 ```javascript

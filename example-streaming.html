@@ -9,9 +9,12 @@
     <script src="https://webrtc.github.io/adapter/adapter-latest.js"></script>
     <script src="https://ajax.googleapis.com/ajax/libs/jquery/3.6.0/jquery.min.js"></script>
     <script src="https://janus.conf.meetecho.com/janus.js"></script>
-    <script src="./videoroom.js"></script>
     <script>
-        const clientReady = createVideoRoomClient({debug: true})
+        const exports = {}
+    </script>
+    <script src="./dist/index.js"></script>
+    <script>
+        const clientReady = exports.createVideoRoomClient({debug: true})
 
         async function connect(server, mountPointId) {
             const client = await clientReady
