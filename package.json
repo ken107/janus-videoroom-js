@@ -1,7 +1,7 @@
 {
   "name": "janus-simple-videoroom-client",
-  "version": "1.0.0",
-  "description": "Provides a simple API that makes it easy to work with the Janus VideoRoom plugin",
+  "version": "1.0.1",
+  "description": "Provides a simple high-level API that makes it easy to work with the Janus VideoRoom plugin",
   "main": "dist/index.js",
   "scripts": {
     "build": "tsc"
