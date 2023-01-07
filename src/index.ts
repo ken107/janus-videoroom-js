@@ -77,6 +77,7 @@ export async function createVideoRoomClient(
 ): Promise<VideoRoomClient> {
     await new Promise(f => Janus.init({...options, callback: f}))
 
+    // construct and return the VideoRoomClient object
     return {
         createSession: createVideoRoomSession
     }
@@ -117,6 +118,7 @@ async function createVideoRoomSession(server: string|string[], options?: JanusSe
         })
     })
 
+    // construct and return the VideoRoomSession object
     return {
         eventTarget,
         isValid() {
@@ -153,41 +155,41 @@ async function attachToPlugin(session: JanusSession, plugin: string): Promise<Ja
 
     const handle: JanusPluginHandleEx = await new Promise(function(fulfill, reject) {
         session.attach({
-            plugin: plugin,
+            plugin,
             success: fulfill,
             error: reject,
             consentDialog(state: unknown) {
-                eventTarget.dispatchEvent(new CustomEvent("consentDialog", {detail: {state: state}}))
+                eventTarget.dispatchEvent(new CustomEvent("consentDialog", {detail: {state}}))
             },
             webrtcState(state: unknown, reason: unknown) {
-                eventTarget.dispatchEvent(new CustomEvent("webrtcState", {detail: {state: state, reason: reason}}))
+                eventTarget.dispatchEvent(new CustomEvent("webrtcState", {detail: {state, reason}}))
             },
             iceState(state: unknown) {
-                eventTarget.dispatchEvent(new CustomEvent("iceState", {detail: {state: state}}))
+                eventTarget.dispatchEvent(new CustomEvent("iceState", {detail: {state}}))
             },
             mediaState(state: unknown) {
-                eventTarget.dispatchEvent(new CustomEvent("mediaState", {detail: {state: state}}))
+                eventTarget.dispatchEvent(new CustomEvent("mediaState", {detail: {state}}))
             },
             slowLink(state: unknown) {
-                eventTarget.dispatchEvent(new CustomEvent("slowLink", {detail: {state: state}}))
+                eventTarget.dispatchEvent(new CustomEvent("slowLink", {detail: {state}}))
             },
             onmessage(message: JanusMessage, jsep: Jsep) {
-                const response = {message: message, jsep: jsep}
+                const response = {message, jsep}
                 const index = pendingRequests.findIndex(x => x.acceptResponse(response))
                 if (index != -1) pendingRequests.splice(index, 1)
-                else eventTarget.dispatchEvent(new CustomEvent("message", {detail: {message: message, jsep: jsep}}))
+                else eventTarget.dispatchEvent(new CustomEvent("message", {detail: {message, jsep}}))
             },
             onlocaltrack(track: MediaStreamTrack, added: boolean) {
-                eventTarget.dispatchEvent(new CustomEvent("localtrack", {detail: {track: track, added: added}}))
+                eventTarget.dispatchEvent(new CustomEvent("localtrack", {detail: {track, added}}))
             },
             onremotetrack(track: MediaStreamTrack, mid: JanusMid, added: boolean) {
-                eventTarget.dispatchEvent(new CustomEvent("remotetrack", {detail: {track: track, mid: mid, added: added}}))
+                eventTarget.dispatchEvent(new CustomEvent("remotetrack", {detail: {track, mid, added}}))
             },
             ondataopen(label: unknown, protocol: unknown) {
-                eventTarget.dispatchEvent(new CustomEvent("dataopen", {detail: {label: label, protocol: protocol}}))
+                eventTarget.dispatchEvent(new CustomEvent("dataopen", {detail: {label, protocol}}))
             },
             ondata(data: unknown, label: unknown) {
-                eventTarget.dispatchEvent(new CustomEvent("data", {detail: {data: data, label: label}}))
+                eventTarget.dispatchEvent(new CustomEvent("data", {detail: {data, label}}))
             },
             oncleanup() {
                 eventTarget.dispatchEvent(new CustomEvent("cleanup"))
@@ -205,7 +207,7 @@ async function attachToPlugin(session: JanusSession, plugin: string): Promise<Ja
     handle.sendRequest = function(message) {
         return new Promise(function(fulfill, reject) {
             handle.send({
-                message: message,
+                message,
                 success: fulfill,
                 error: reject
             })
@@ -308,7 +310,7 @@ async function joinVideoRoom(session: JanusSession, roomId: string|number): Prom
 
         // construct and return the VideoRoom object
         return {
-            roomId: roomId,
+            roomId,
             pluginHandle: handle,
             onPublisherAdded(callback) {
                 callbacks.set("onPublisherAdded", callback)
@@ -402,13 +404,13 @@ async function createVideoRoomPublisher(
                 jsep: response.jsep,
                 success: fulfill,
                 error: reject,
-                customizeSdp: options.mediaOptions && options.mediaOptions.customizeRemoteSdp
+                customizeSdp: options.mediaOptions?.customizeRemoteSdp
             })
         })
 
         // construct and return the VideoRoomPublisher object
         return {
-            publisherId: publisherId,
+            publisherId,
             onTrackAdded(callback) {
                 callbacks.set("onTrackAdded", callback)
             },
@@ -508,7 +510,7 @@ async function createVideoRoomSubscriber(
                 request: "join",
                 ptype: "subscriber",
                 room: roomId,
-                streams: streams
+                streams
             },
             expectResponse: r => r.message.videoroom == "attached" && r.message.room == roomId
         })
@@ -526,14 +528,14 @@ async function createVideoRoomSubscriber(
             },
             async addStreams(streams) {
                 const response = await handle.sendAsyncRequest({
-                    message: {request: "subscribe", streams: streams},
+                    message: {request: "subscribe", streams},
                     expectResponse: r => r.message.videoroom == "updated" && r.message.room == roomId
                 })
                 if (response.jsep) await handleOffer(handle, response.jsep, options.mediaOptions)
             },
             async removeStreams(streams) {
                 const response = await handle.sendAsyncRequest({
-                    message: {request: "unsubscribe", streams: streams},
+                    message: {request: "unsubscribe", streams},
                     expectResponse: r => r.message.videoroom == "updated" && r.message.room == roomId
                 })
                 if (response.jsep) await handleOffer(handle, response.jsep, options.mediaOptions)
@@ -633,7 +635,7 @@ async function createStreamingSubscriber(
                 request: "watch",
                 id: mountPointId
             },
-            expectResponse: r => r.message.streaming == "event" && r.message.result && r.message.result.status == "preparing"
+            expectResponse: r => r.message.streaming == "event" && r.message.result?.status == "preparing"
         })
 
         if (!response.jsep) throw new Error("Missing offer Jsep")
@@ -650,13 +652,13 @@ async function createStreamingSubscriber(
             async pause() {
                 await handle.sendAsyncRequest({
                     message: {request: "pause"},
-                    expectResponse: r => r.message.streaming == "event" && r.message.result && r.message.result.status == "pausing"
+                    expectResponse: r => r.message.streaming == "event" && r.message.result?.status == "pausing"
                 })
             },
             async resume() {
                 await handle.sendAsyncRequest({
                     message: {request: "start"},
-                    expectResponse: r => r.message.streaming == "event" && r.message.result && r.message.result.status == "starting"
+                    expectResponse: r => r.message.streaming == "event" && r.message.result?.status == "starting"
                 })
             },
             async configure(configureOptions) {
@@ -665,7 +667,7 @@ async function createStreamingSubscriber(
                         ...configureOptions,
                         request: "configure"
                     },
-                    expectResponse: r => r.message.streaming == "event" && r.message.result && r.message.result.event == "configured"
+                    expectResponse: r => r.message.streaming == "event" && r.message.result?.event == "configured"
                 })
             },
             async switch(newMountPointId) {
@@ -674,7 +676,7 @@ async function createStreamingSubscriber(
                         request: "switch",
                         id: newMountPointId
                     },
-                    expectResponse: r => r.message.streaming == "event" && r.message.result && r.message.result.switched == "ok"
+                    expectResponse: r => r.message.streaming == "event" && r.message.result?.switched == "ok"
                 })
                 mountPointId = newMountPointId
             },
@@ -686,7 +688,7 @@ async function createStreamingSubscriber(
                         request: "watch",
                         id: mountPointId
                     },
-                    expectResponse: r => r.message.streaming == "event" && r.message.result && r.message.result.status == "preparing"
+                    expectResponse: r => r.message.streaming == "event" && r.message.result?.status == "preparing"
                 })
                 if (!response.jsep) throw new Error("Missing offer Jsep")
                 await handleOffer(handle, response.jsep, newOptions.mediaOptions)
@@ -707,7 +709,7 @@ async function createStreamingSubscriber(
 
 async function handleOffer(handle: JanusPluginHandleEx, offerJsep: Jsep, mediaOptions?: JanusMediaOptions): Promise<void> {
     // allow customizing the remote (offer) sdp
-    if (mediaOptions && mediaOptions.customizeRemoteSdp) {
+    if (mediaOptions?.customizeRemoteSdp) {
         mediaOptions.customizeRemoteSdp(offerJsep)
     }
 
@@ -726,7 +728,7 @@ async function handleOffer(handle: JanusPluginHandleEx, offerJsep: Jsep, mediaOp
         message: {request: "start"},
         jsep: answerJsep,
         expectResponse: r => r.message.videoroom == "event" && r.message.started == "ok" ||
-            r.message.streaming == "event" && r.message.result && r.message.result.status == "starting"
+            r.message.streaming == "event" && r.message.result?.status == "starting"
     })
 }
 

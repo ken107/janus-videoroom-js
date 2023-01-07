@@ -52,9 +52,12 @@ function createVideoRoomClient(options) {
     return __awaiter(this, void 0, void 0, function () {
         return __generator(this, function (_a) {
             switch (_a.label) {
-                case 0: return [4 /*yield*/, new Promise(function (f) { return Janus.init(__assign(__assign({}, options), { callback: f })); })];
+                case 0: return [4 /*yield*/, new Promise(function (f) { return Janus.init(__assign(__assign({}, options), { callback: f })); })
+                    // construct and return the VideoRoomClient object
+                ];
                 case 1:
                     _a.sent();
+                    // construct and return the VideoRoomClient object
                     return [2 /*return*/, {
                             createSession: createVideoRoomSession
                         }];
@@ -92,9 +95,12 @@ function createVideoRoomSession(server, options) {
                                         console.error(err);
                                     }
                                 } }));
-                        })];
+                        })
+                        // construct and return the VideoRoomSession object
+                    ];
                 case 1:
                     _a.sent();
+                    // construct and return the VideoRoomSession object
                     return [2 /*return*/, {
                             eventTarget: eventTarget,
                             isValid: function () {
@@ -424,11 +430,12 @@ function createVideoRoomPublisher(handle, publisherId, opts) {
                     });
                     // handle the answer JSEP
                     return [4 /*yield*/, new Promise(function (fulfill, reject) {
+                            var _a;
                             handle.handleRemoteJsep({
                                 jsep: response_2.jsep,
                                 success: fulfill,
                                 error: reject,
-                                customizeSdp: options.mediaOptions && options.mediaOptions.customizeRemoteSdp
+                                customizeSdp: (_a = options.mediaOptions) === null || _a === void 0 ? void 0 : _a.customizeRemoteSdp
                             });
                         })
                         // construct and return the VideoRoomPublisher object
@@ -778,7 +785,7 @@ function createStreamingSubscriber(session, mountPointId, opts) {
                     });
                     return [4 /*yield*/, handle_3.sendAsyncRequest({
                             message: __assign(__assign({}, options.watchOptions), { request: "watch", id: mountPointId }),
-                            expectResponse: function (r) { return r.message.streaming == "event" && r.message.result && r.message.result.status == "preparing"; }
+                            expectResponse: function (r) { var _a; return r.message.streaming == "event" && ((_a = r.message.result) === null || _a === void 0 ? void 0 : _a.status) == "preparing"; }
                         })];
                 case 3:
                     response = _a.sent();
@@ -803,7 +810,7 @@ function createStreamingSubscriber(session, mountPointId, opts) {
                                         switch (_a.label) {
                                             case 0: return [4 /*yield*/, handle_3.sendAsyncRequest({
                                                     message: { request: "pause" },
-                                                    expectResponse: function (r) { return r.message.streaming == "event" && r.message.result && r.message.result.status == "pausing"; }
+                                                    expectResponse: function (r) { var _a; return r.message.streaming == "event" && ((_a = r.message.result) === null || _a === void 0 ? void 0 : _a.status) == "pausing"; }
                                                 })];
                                             case 1:
                                                 _a.sent();
@@ -818,7 +825,7 @@ function createStreamingSubscriber(session, mountPointId, opts) {
                                         switch (_a.label) {
                                             case 0: return [4 /*yield*/, handle_3.sendAsyncRequest({
                                                     message: { request: "start" },
-                                                    expectResponse: function (r) { return r.message.streaming == "event" && r.message.result && r.message.result.status == "starting"; }
+                                                    expectResponse: function (r) { var _a; return r.message.streaming == "event" && ((_a = r.message.result) === null || _a === void 0 ? void 0 : _a.status) == "starting"; }
                                                 })];
                                             case 1:
                                                 _a.sent();
@@ -833,7 +840,7 @@ function createStreamingSubscriber(session, mountPointId, opts) {
                                         switch (_a.label) {
                                             case 0: return [4 /*yield*/, handle_3.sendAsyncRequest({
                                                     message: __assign(__assign({}, configureOptions), { request: "configure" }),
-                                                    expectResponse: function (r) { return r.message.streaming == "event" && r.message.result && r.message.result.event == "configured"; }
+                                                    expectResponse: function (r) { var _a; return r.message.streaming == "event" && ((_a = r.message.result) === null || _a === void 0 ? void 0 : _a.event) == "configured"; }
                                                 })];
                                             case 1:
                                                 _a.sent();
@@ -851,7 +858,7 @@ function createStreamingSubscriber(session, mountPointId, opts) {
                                                         request: "switch",
                                                         id: newMountPointId
                                                     },
-                                                    expectResponse: function (r) { return r.message.streaming == "event" && r.message.result && r.message.result.switched == "ok"; }
+                                                    expectResponse: function (r) { var _a; return r.message.streaming == "event" && ((_a = r.message.result) === null || _a === void 0 ? void 0 : _a.switched) == "ok"; }
                                                 })];
                                             case 1:
                                                 _a.sent();
@@ -870,7 +877,7 @@ function createStreamingSubscriber(session, mountPointId, opts) {
                                                 newOptions = __assign({}, newOpts);
                                                 return [4 /*yield*/, handle_3.sendAsyncRequest({
                                                         message: __assign(__assign({}, newOptions.watchOptions), { request: "watch", id: mountPointId }),
-                                                        expectResponse: function (r) { return r.message.streaming == "event" && r.message.result && r.message.result.status == "preparing"; }
+                                                        expectResponse: function (r) { var _a; return r.message.streaming == "event" && ((_a = r.message.result) === null || _a === void 0 ? void 0 : _a.status) == "preparing"; }
                                                     })];
                                             case 1:
                                                 response = _a.sent();
@@ -916,7 +923,7 @@ function handleOffer(handle, offerJsep, mediaOptions) {
             switch (_a.label) {
                 case 0:
                     // allow customizing the remote (offer) sdp
-                    if (mediaOptions && mediaOptions.customizeRemoteSdp) {
+                    if (mediaOptions === null || mediaOptions === void 0 ? void 0 : mediaOptions.customizeRemoteSdp) {
                         mediaOptions.customizeRemoteSdp(offerJsep);
                     }
                     return [4 /*yield*/, new Promise(function (fulfill, reject) {
@@ -928,8 +935,11 @@ function handleOffer(handle, offerJsep, mediaOptions) {
                     return [4 /*yield*/, handle.sendAsyncRequest({
                             message: { request: "start" },
                             jsep: answerJsep,
-                            expectResponse: function (r) { return r.message.videoroom == "event" && r.message.started == "ok" ||
-                                r.message.streaming == "event" && r.message.result && r.message.result.status == "starting"; }
+                            expectResponse: function (r) {
+                                var _a;
+                                return r.message.videoroom == "event" && r.message.started == "ok" ||
+                                    r.message.streaming == "event" && ((_a = r.message.result) === null || _a === void 0 ? void 0 : _a.status) == "starting";
+                            }
                         })];
                 case 2:
                     _a.sent();
