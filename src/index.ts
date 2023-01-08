@@ -1,10 +1,10 @@
 import { JanusMediaOptions, JanusMessage, JanusMid, JanusPluginHandle, JanusPublishOptions, JanusSession, JanusSessionOptions, JanusStreamSpec, JanusSubscriberConfigureOptions, JanusWatchOptions, Jsep } from "./janus"
 
-interface VideoRoomClient {
+export interface VideoRoomClient {
     createSession(server: string|string[], options?: JanusSessionOptions): Promise<VideoRoomSession>
 }
 
-interface VideoRoomSession {
+export interface VideoRoomSession {
     eventTarget: ReturnType<typeof makeEventTarget>
     isValid(): boolean
     joinRoom(roomId: string|number): Promise<VideoRoom>
@@ -14,7 +14,7 @@ interface VideoRoomSession {
     destroy(): Promise<void>
 }
 
-interface VideoRoom {
+export interface VideoRoom {
     roomId: string|number
     pluginHandle: JanusPluginHandleEx
     onPublisherAdded(callback: (publishers: unknown[]) => void): void
@@ -24,7 +24,7 @@ interface VideoRoom {
     leave(): Promise<void>
 }
 
-interface VideoRoomPublisher {
+export interface VideoRoomPublisher {
     publisherId: string|number
     onTrackAdded(callback: (track: MediaStreamTrack) => void): void
     onTrackRemoved(callback: (track: MediaStreamTrack) => void): void
@@ -33,7 +33,7 @@ interface VideoRoomPublisher {
     unpublish(): Promise<void>
 }
 
-interface VideoRoomSubscriber {
+export interface VideoRoomSubscriber {
     onTrackAdded(callback: (track: MediaStreamTrack, mid: JanusMid) => void): void
     onTrackRemoved(callback: (track: MediaStreamTrack, mid: JanusMid) => void): void
     addStreams(streams: JanusStreamSpec[]): Promise<void>
@@ -45,7 +45,7 @@ interface VideoRoomSubscriber {
     unsubscribe(): Promise<void>
 }
 
-interface StreamingSubscriber {
+export interface StreamingSubscriber {
     onTrackAdded(callback: (track: MediaStreamTrack, mid: JanusMid) => void): void
     onTrackRemoved(callback: (track: MediaStreamTrack, mid: JanusMid) => void): void
     pause(): Promise<void>
@@ -56,7 +56,7 @@ interface StreamingSubscriber {
     unsubscribe(): Promise<void>
 }
 
-interface JanusPluginHandleEx extends JanusPluginHandle {
+export interface JanusPluginHandleEx extends JanusPluginHandle {
     eventTarget: ReturnType<typeof makeEventTarget>
     sendRequest(message: JanusMessage): Promise<JanusMessage>
     sendAsyncRequest(options: {message: JanusMessage, jsep?: Jsep, expectResponse: (response: AsyncResponse) => boolean}): Promise<AsyncResponse>
