@@ -39,6 +39,7 @@ export interface VideoRoomPublisher {
     unpublish(): Promise<void>;
 }
 export interface VideoRoomSubscriber {
+    pluginHandle: JanusPluginHandleEx;
     onTrackAdded(callback: (track: MediaStreamTrack, mid: JanusMid) => void): void;
     onTrackRemoved(callback: (track: MediaStreamTrack, mid: JanusMid) => void): void;
     addStreams(streams: JanusStreamSpec[]): Promise<void>;
@@ -50,6 +51,7 @@ export interface VideoRoomSubscriber {
     unsubscribe(): Promise<void>;
 }
 export interface StreamingSubscriber {
+    pluginHandle: JanusPluginHandleEx;
     onTrackAdded(callback: (track: MediaStreamTrack, mid: JanusMid) => void): void;
     onTrackRemoved(callback: (track: MediaStreamTrack, mid: JanusMid) => void): void;
     pause(): Promise<void>;

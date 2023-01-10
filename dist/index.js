@@ -593,6 +593,7 @@ function createVideoRoomSubscriber(session, roomId, streams, opts) {
                     _a.sent();
                     // construct and return the VideoRoomSubscriber object
                     return [2 /*return*/, {
+                            pluginHandle: handle_2,
                             onTrackAdded: function (callback) {
                                 callbacks.set("onTrackAdded", callback);
                             },
@@ -798,6 +799,7 @@ function createStreamingSubscriber(session, mountPointId, opts) {
                     _a.sent();
                     // construct and return the StreamingSubscriber object
                     return [2 /*return*/, {
+                            pluginHandle: handle_3,
                             onTrackAdded: function (callback) {
                                 callbacks.set("onTrackAdded", callback);
                             },

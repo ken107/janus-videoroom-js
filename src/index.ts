@@ -34,6 +34,7 @@ export interface VideoRoomPublisher {
 }
 
 export interface VideoRoomSubscriber {
+    pluginHandle: JanusPluginHandleEx
     onTrackAdded(callback: (track: MediaStreamTrack, mid: JanusMid) => void): void
     onTrackRemoved(callback: (track: MediaStreamTrack, mid: JanusMid) => void): void
     addStreams(streams: JanusStreamSpec[]): Promise<void>
@@ -46,6 +47,7 @@ export interface VideoRoomSubscriber {
 }
 
 export interface StreamingSubscriber {
+    pluginHandle: JanusPluginHandleEx
     onTrackAdded(callback: (track: MediaStreamTrack, mid: JanusMid) => void): void
     onTrackRemoved(callback: (track: MediaStreamTrack, mid: JanusMid) => void): void
     pause(): Promise<void>
@@ -520,6 +522,7 @@ async function createVideoRoomSubscriber(
 
         // construct and return the VideoRoomSubscriber object
         return {
+            pluginHandle: handle,
             onTrackAdded(callback) {
                 callbacks.set("onTrackAdded", callback)
             },
@@ -643,6 +646,7 @@ async function createStreamingSubscriber(
 
         // construct and return the StreamingSubscriber object
         return {
+            pluginHandle: handle,
             onTrackAdded(callback) {
                 callbacks.set("onTrackAdded", callback)
             },
