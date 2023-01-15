@@ -1,8 +1,13 @@
 # janus-simple-videoroom-client
 Built on top of janus.js, this thin client library provides a simple high-level API that makes it easy to work with the Janus VideoRoom plugin.
 
+## Install
+`npm install janus-simple-videoroom-client`
+
 ## Usage
 ```javascript
+import { createVideoRoomClient } from "janus-simple-videoroom-client"
+
 async function joinRoom(server, roomId, displayName) {
     const client = await createVideoRoomClient()
     const session = await client.createSession(server)
@@ -45,7 +50,9 @@ Check out the [example](https://ken107.github.io/janus-videoroom-js/example.html
 | -------- | ----------- |
 | isValid() | Return whether the session is connected and valid |
 | joinRoom(_roomId_) | Joins a room, returns a VideoRoom object |
+| watch(_mountpointId_, _options_) | Subscribe to a streaming mountpoint, return a StreamingSubscriber object |
 | attachToPlugin() | Attach to the VideoRoom plugin without joining a room, returns a JanusPluginHandleEx object |
+| destroy() | Destroy the session |
 
 ### VideoRoom
 
@@ -62,6 +69,7 @@ Check out the [example](https://ken107.github.io/janus-videoroom-js/example.html
 
 | Property | Description |
 | -------- | ----------- |
+| publisherId | |
 | onTrackAdded(_callback_) | Register a callback for when a local MediaStreamTrack is available to display |
 | onTrackRemoved(_callback_) | Register a callback for when a local MediaStreamTrack terminates |
 | configure(_options_) | Modify publisher properties |
@@ -72,6 +80,7 @@ Check out the [example](https://ken107.github.io/janus-videoroom-js/example.html
 
 | Property | Description |
 | -------- | ----------- |
+| pluginHandle | The JanusPluginHandleEx object associated with this subscriber |
 | onTrackAdded(_callback_) | Register a callback for when a remote MediaStreamTrack is available to display |
 | onTrackRemoved(_callback_) | Register a callback for when a remote MediaStreamTrack terminates |
 | addStreams(_streams_) | Add additional streams to this (multi-stream) subscriber |
