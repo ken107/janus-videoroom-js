@@ -35,7 +35,7 @@ export interface VideoRoomPublisher {
     onTrackAdded(callback: (track: MediaStreamTrack) => void): void;
     onTrackRemoved(callback: (track: MediaStreamTrack) => void): void;
     configure(configureOptions: JanusPublishOptions): Promise<void>;
-    restart(mediaOptions: JanusMediaOptions): Promise<void>;
+    restart(mediaOptions?: JanusMediaOptions): Promise<void>;
     unpublish(): Promise<void>;
 }
 export interface VideoRoomSubscriber {
@@ -47,7 +47,7 @@ export interface VideoRoomSubscriber {
     pause(): Promise<void>;
     resume(): Promise<void>;
     configure(configureOptions: JanusSubscriberConfigureOptions): Promise<void>;
-    restart(mediaOptions: JanusMediaOptions): Promise<void>;
+    restart(mediaOptions?: JanusMediaOptions): Promise<void>;
     unsubscribe(): Promise<void>;
 }
 export interface StreamingSubscriber {

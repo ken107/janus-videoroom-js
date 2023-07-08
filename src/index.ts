@@ -29,7 +29,7 @@ export interface VideoRoomPublisher {
     onTrackAdded(callback: (track: MediaStreamTrack) => void): void
     onTrackRemoved(callback: (track: MediaStreamTrack) => void): void
     configure(configureOptions: JanusPublishOptions): Promise<void>
-    restart(mediaOptions: JanusMediaOptions): Promise<void>
+    restart(mediaOptions?: JanusMediaOptions): Promise<void>
     unpublish(): Promise<void>
 }
 
@@ -42,7 +42,7 @@ export interface VideoRoomSubscriber {
     pause(): Promise<void>
     resume(): Promise<void>
     configure(configureOptions: JanusSubscriberConfigureOptions): Promise<void>
-    restart(mediaOptions: JanusMediaOptions): Promise<void>
+    restart(mediaOptions?: JanusMediaOptions): Promise<void>
     unsubscribe(): Promise<void>
 }
 
@@ -428,7 +428,7 @@ async function createVideoRoomPublisher(
                     expectResponse: r => r.message.videoroom == "event" && r.message.configured == "ok"
                 })
             },
-            async restart(mediaOptions) {
+            async restart(mediaOptions = options.mediaOptions) {
                 const offerJsep = await new Promise<Jsep>(function(fulfill, reject) {
                     handle.createOffer({
                         ...mediaOptions,
@@ -446,6 +446,7 @@ async function createVideoRoomPublisher(
                 await new Promise(function(fulfill, reject) {
                     handle.handleRemoteJsep({
                         jsep: response.jsep,
+                        customizeSdp: mediaOptions?.customizeRemoteSdp,
                         success: fulfill,
                         error: reject
                     })
@@ -565,7 +566,7 @@ async function createVideoRoomSubscriber(
                     expectResponse: r => r.message.videoroom == "event" && r.message.configured == "ok"
                 })
             },
-            async restart(mediaOptions) {
+            async restart(mediaOptions = options.mediaOptions) {
                 const response = await handle.sendAsyncRequest({
                     message: {
                         request: "configure",
@@ -593,13 +594,12 @@ async function createVideoRoomSubscriber(
 async function createStreamingSubscriber(
     session: JanusSession,
     mountPointId: number,
-    opts?: {
+    options?: {
         watchOptions?: JanusWatchOptions
         mediaOptions?: JanusMediaOptions
     }
 ): Promise<StreamingSubscriber> {
 
-    let options = {...opts}
     const cleanup = makeCleanup()
     const callbacks = makeCallbacks()
 
@@ -634,7 +634,7 @@ async function createStreamingSubscriber(
         // send the watch request
         const response = await handle.sendAsyncRequest({
             message: {
-                ...options.watchOptions,
+                ...options?.watchOptions,
                 request: "watch",
                 id: mountPointId
             },
@@ -642,7 +642,7 @@ async function createStreamingSubscriber(
         })
 
         if (!response.jsep) throw new Error("Missing offer Jsep")
-        await handleOffer(handle, response.jsep, options.mediaOptions)
+        await handleOffer(handle, response.jsep, options?.mediaOptions)
 
         // construct and return the StreamingSubscriber object
         return {
@@ -684,18 +684,17 @@ async function createStreamingSubscriber(
                 })
                 mountPointId = newMountPointId
             },
-            async restart(newOpts) {
-                const newOptions = {...newOpts}
+            async restart(newOptions = options) {
                 const response = await handle.sendAsyncRequest({
                     message: {
-                        ...newOptions.watchOptions,
+                        ...newOptions?.watchOptions,
                         request: "watch",
                         id: mountPointId
                     },
                     expectResponse: r => r.message.streaming == "event" && r.message.result?.status == "preparing"
                 })
                 if (!response.jsep) throw new Error("Missing offer Jsep")
-                await handleOffer(handle, response.jsep, newOptions.mediaOptions)
+                await handleOffer(handle, response.jsep, newOptions?.mediaOptions)
                 options = newOptions
             },
             async unsubscribe() {

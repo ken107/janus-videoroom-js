@@ -468,6 +468,7 @@ function createVideoRoomPublisher(handle, publisherId, opts) {
                                 });
                             },
                             restart: function (mediaOptions) {
+                                if (mediaOptions === void 0) { mediaOptions = options.mediaOptions; }
                                 return __awaiter(this, void 0, void 0, function () {
                                     var offerJsep, response;
                                     return __generator(this, function (_a) {
@@ -489,6 +490,7 @@ function createVideoRoomPublisher(handle, publisherId, opts) {
                                                 return [4 /*yield*/, new Promise(function (fulfill, reject) {
                                                         handle.handleRemoteJsep({
                                                             jsep: response.jsep,
+                                                            customizeSdp: mediaOptions === null || mediaOptions === void 0 ? void 0 : mediaOptions.customizeRemoteSdp,
                                                             success: fulfill,
                                                             error: reject
                                                         });
@@ -688,6 +690,7 @@ function createVideoRoomSubscriber(session, roomId, streams, opts) {
                                 });
                             },
                             restart: function (mediaOptions) {
+                                if (mediaOptions === void 0) { mediaOptions = options.mediaOptions; }
                                 return __awaiter(this, void 0, void 0, function () {
                                     var response;
                                     return __generator(this, function (_a) {
@@ -736,13 +739,12 @@ function createVideoRoomSubscriber(session, roomId, streams, opts) {
         });
     });
 }
-function createStreamingSubscriber(session, mountPointId, opts) {
+function createStreamingSubscriber(session, mountPointId, options) {
     return __awaiter(this, void 0, void 0, function () {
-        var options, cleanup, callbacks, handle_3, response, err_4;
+        var cleanup, callbacks, handle_3, response, err_4;
         return __generator(this, function (_a) {
             switch (_a.label) {
                 case 0:
-                    options = __assign({}, opts);
                     cleanup = makeCleanup();
                     callbacks = makeCallbacks();
                     _a.label = 1;
@@ -785,14 +787,14 @@ function createStreamingSubscriber(session, mountPointId, opts) {
                         }
                     });
                     return [4 /*yield*/, handle_3.sendAsyncRequest({
-                            message: __assign(__assign({}, options.watchOptions), { request: "watch", id: mountPointId }),
+                            message: __assign(__assign({}, options === null || options === void 0 ? void 0 : options.watchOptions), { request: "watch", id: mountPointId }),
                             expectResponse: function (r) { var _a; return r.message.streaming == "event" && ((_a = r.message.result) === null || _a === void 0 ? void 0 : _a.status) == "preparing"; }
                         })];
                 case 3:
                     response = _a.sent();
                     if (!response.jsep)
                         throw new Error("Missing offer Jsep");
-                    return [4 /*yield*/, handleOffer(handle_3, response.jsep, options.mediaOptions)
+                    return [4 /*yield*/, handleOffer(handle_3, response.jsep, options === null || options === void 0 ? void 0 : options.mediaOptions)
                         // construct and return the StreamingSubscriber object
                     ];
                 case 4:
@@ -870,22 +872,21 @@ function createStreamingSubscriber(session, mountPointId, opts) {
                                     });
                                 });
                             },
-                            restart: function (newOpts) {
+                            restart: function (newOptions) {
+                                if (newOptions === void 0) { newOptions = options; }
                                 return __awaiter(this, void 0, void 0, function () {
-                                    var newOptions, response;
+                                    var response;
                                     return __generator(this, function (_a) {
                                         switch (_a.label) {
-                                            case 0:
-                                                newOptions = __assign({}, newOpts);
-                                                return [4 /*yield*/, handle_3.sendAsyncRequest({
-                                                        message: __assign(__assign({}, newOptions.watchOptions), { request: "watch", id: mountPointId }),
-                                                        expectResponse: function (r) { var _a; return r.message.streaming == "event" && ((_a = r.message.result) === null || _a === void 0 ? void 0 : _a.status) == "preparing"; }
-                                                    })];
+                                            case 0: return [4 /*yield*/, handle_3.sendAsyncRequest({
+                                                    message: __assign(__assign({}, newOptions === null || newOptions === void 0 ? void 0 : newOptions.watchOptions), { request: "watch", id: mountPointId }),
+                                                    expectResponse: function (r) { var _a; return r.message.streaming == "event" && ((_a = r.message.result) === null || _a === void 0 ? void 0 : _a.status) == "preparing"; }
+                                                })];
                                             case 1:
                                                 response = _a.sent();
                                                 if (!response.jsep)
                                                     throw new Error("Missing offer Jsep");
-                                                return [4 /*yield*/, handleOffer(handle_3, response.jsep, newOptions.mediaOptions)];
+                                                return [4 /*yield*/, handleOffer(handle_3, response.jsep, newOptions === null || newOptions === void 0 ? void 0 : newOptions.mediaOptions)];
                                             case 2:
                                                 _a.sent();
                                                 options = newOptions;
