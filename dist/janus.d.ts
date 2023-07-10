@@ -71,7 +71,7 @@ interface JanusMediaOptions {
 interface JanusTrackSpec {
     type: string
     mid?: JanusMid
-    capture?: boolean|string|{deviceId: unknown, width?: number, height?: number}
+    capture?: boolean|string|{deviceId: unknown, width?: number, height?: number}|MediaStreamTrack
     simulcast?: boolean
     svc?: unknown
     recv?: boolean
