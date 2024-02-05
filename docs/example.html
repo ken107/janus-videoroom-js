@@ -18,19 +18,10 @@
         }
     </style>
 
-    <script src="https://webrtc.github.io/adapter/adapter-latest.js"></script>
     <script src="https://ajax.googleapis.com/ajax/libs/jquery/3.6.0/jquery.min.js"></script>
-    <script src="https://janus.conf.meetecho.com/demos/janus.js"></script>
+    <script src="videoroom.js"></script>
     <script>
-        const exports = {}
-        function require(name) {
-            if (name == "janus-gateway") return {default: Janus}
-            throw new Error("Unhandled import")
-        }
-    </script>
-    <script src="./dist/index.js"></script>
-    <script>
-        const clientReady = exports.createVideoRoomClient({debug: true})
+        const clientReady = videoroom.createVideoRoomClient({debug: true})
 
         async function connect(server, roomId, displayName) {
             const client = await clientReady
@@ -75,7 +66,7 @@
             const stream = new MediaStream()
             const $display = $("<div class='display'><div class='name'></div><video autoplay></video></div>").appendTo("#displays")
             $display.find(".name").text(displayName)
-            Janus.attachMediaStream($display.find("video").get(0), stream)
+            $display.find("video").get(0).srcObject = stream
             return {
                 stream: stream,
                 remove: () => $display.remove()

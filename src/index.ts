@@ -1,4 +1,13 @@
+/**
+ * Remove this once janus.js properly imports webrtc-adapter.
+ * Currently janus npm package depends on webrtc-adapter but does not import it, and so it gets dropped during tree shaking.
+ */
+import adapter from "webrtc-adapter"
+if (!(window as any).adapter) (window as any).adapter = adapter
+
+
 import Janus from "janus-gateway"
+export { Janus }
 
 type JanusSessionOptions = ConstructorParameters<typeof Janus>[0]
 type JanusPluginOptions = Parameters<Janus["attach"]>[0]

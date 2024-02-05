@@ -1,4 +1,5 @@
 import Janus from "janus-gateway";
+export { Janus };
 type JanusSessionOptions = ConstructorParameters<typeof Janus>[0];
 type JanusPluginOptions = Parameters<Janus["attach"]>[0];
 type JanusPluginHandle = Parameters<NonNullable<JanusPluginOptions["success"]>>[0];
@@ -140,4 +141,3 @@ declare function makeEventTarget(): {
     removeEventListener(name: string, callback: (event: CustomEvent) => void): void;
     dispatchEvent(event: Event): void;
 };
-export {};

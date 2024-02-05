@@ -4,7 +4,8 @@
   "description": "Provides a simple high-level API that makes it easy to work with the Janus VideoRoom plugin",
   "main": "dist/index.js",
   "scripts": {
-    "build": "tsc"
+    "build": "tsc",
+    "pack": "webpack --mode=production"
   },
   "repository": {
     "type": "git",
@@ -17,7 +18,10 @@
   },
   "homepage": "https://github.com/ken107/janus-videoroom-js#readme",
   "devDependencies": {
-    "typescript": "^4.9.4"
+    "ts-loader": "^9.5.1",
+    "typescript": "^4.9.4",
+    "webpack": "^5.90.1",
+    "webpack-cli": "^5.1.4"
   },
   "dependencies": {
     "janus-gateway": "^1.2.1"
