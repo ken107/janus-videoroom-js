@@ -1,4 +1,54 @@
-import { JanusMediaOptions, JanusMessage, JanusMid, JanusPluginHandle, JanusPublishOptions, JanusSessionOptions, JanusStreamSpec, JanusSubscriberConfigureOptions, JanusWatchOptions, Jsep } from "./janus";
+import Janus from "janus-gateway";
+type JanusSessionOptions = ConstructorParameters<typeof Janus>[0];
+type JanusPluginOptions = Parameters<Janus["attach"]>[0];
+type JanusPluginHandle = Parameters<NonNullable<JanusPluginOptions["success"]>>[0];
+type JanusMid = unknown;
+type JanusOfferParams = Parameters<JanusPluginHandle["createOffer"]>[0];
+type JanusTrackOption = NonNullable<JanusOfferParams["tracks"]>[number];
+type Jsep = Parameters<NonNullable<JanusOfferParams["success"]>>[0];
+interface JanusMessage {
+    [key: string]: any;
+}
+interface JanusMediaOptions {
+    tracks?: JanusTrackOption[];
+    trickle?: boolean;
+    stream?: MediaStream;
+    customizeSdp?: (jsep: Jsep) => void;
+    customizeRemoteSdp?: (jsep: Jsep) => void;
+}
+interface JanusStreamSpec {
+    feed: unknown;
+    mid?: JanusMid;
+}
+interface JanusWatchOptions {
+    pin?: string;
+    media?: string[];
+}
+interface JanusPublishOptions {
+    audiocodec?: string;
+    videocodec?: string;
+    bitrate?: number;
+    record?: boolean;
+    filename?: string;
+    display?: string;
+    audio_level_average?: number;
+    audio_active_packets?: number;
+    descriptions?: {
+        mid: JanusMid;
+        description: string;
+    }[];
+}
+interface JanusSubscriberConfigureOptions {
+    mid?: JanusMid;
+    send?: boolean;
+    substream?: number;
+    temporal?: number;
+    fallback?: number;
+    spatial_layer?: number;
+    temporal_layer?: number;
+    audio_level_average?: number;
+    audio_active_packets?: number;
+}
 export interface VideoRoomClient {
     createSession(server: string | string[], options?: JanusSessionOptions): Promise<VideoRoomSession>;
 }
@@ -66,21 +116,25 @@ export interface StreamingSubscriber {
 }
 export interface JanusPluginHandleEx extends JanusPluginHandle {
     eventTarget: ReturnType<typeof makeEventTarget>;
-    sendRequest(message: JanusMessage): Promise<JanusMessage>;
+    sendRequest(message: JanusMessage & {
+        request: string;
+    }): Promise<JanusMessage>;
     sendAsyncRequest(options: {
-        message: JanusMessage;
+        message: JanusMessage & {
+            request: string;
+        };
         jsep?: Jsep;
         expectResponse: (response: AsyncResponse) => boolean;
     }): Promise<AsyncResponse>;
+    handleRemoteJsep(params: Parameters<JanusPluginHandle["handleRemoteJsep"]>[0] & {
+        customizeSdp?: (jsep: Jsep) => void;
+    }): void;
 }
 interface AsyncResponse {
     message: JanusMessage;
     jsep?: Jsep;
 }
-export declare function createVideoRoomClient(options?: {
-    debug?: boolean | string[];
-    dependencies?: unknown;
-}): Promise<VideoRoomClient>;
+export declare function createVideoRoomClient(options?: Parameters<typeof Janus.init>[0]): Promise<VideoRoomClient>;
 declare function makeEventTarget(): {
     addEventListener(name: string, callback: (event: CustomEvent) => void): void;
     removeEventListener(name: string, callback: (event: CustomEvent) => void): void;

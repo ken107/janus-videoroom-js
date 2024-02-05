@@ -48,11 +48,12 @@ var __generator = (this && this.__generator) || function (thisArg, body) {
 };
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.createVideoRoomClient = void 0;
+var janus_gateway_1 = require("janus-gateway");
 function createVideoRoomClient(options) {
     return __awaiter(this, void 0, void 0, function () {
         return __generator(this, function (_a) {
             switch (_a.label) {
-                case 0: return [4 /*yield*/, new Promise(function (f) { return Janus.init(__assign(__assign({}, options), { callback: f })); })
+                case 0: return [4 /*yield*/, new Promise(function (f) { return janus_gateway_1.default.init(__assign(__assign({}, options), { callback: f })); })
                     // construct and return the VideoRoomClient object
                 ];
                 case 1:
@@ -75,7 +76,7 @@ function createVideoRoomSession(server, options) {
                     eventTarget = makeEventTarget();
                     return [4 /*yield*/, new Promise(function (fulfill, reject) {
                             var resolved = false;
-                            session = new Janus(__assign(__assign({}, options), { server: server, success: function () {
+                            session = new janus_gateway_1.default(__assign(__assign({}, options), { server: server, success: function () {
                                     if (!resolved) {
                                         fulfill();
                                         resolved = true;
@@ -151,13 +152,15 @@ function attachToPlugin(session, plugin) {
                     return [4 /*yield*/, new Promise(function (fulfill, reject) {
                             session.attach({
                                 plugin: plugin,
-                                success: fulfill,
+                                success: function (handle) {
+                                    fulfill(handle);
+                                },
                                 error: reject,
                                 consentDialog: function (state) {
                                     eventTarget.dispatchEvent(new CustomEvent("consentDialog", { detail: { state: state } }));
                                 },
-                                webrtcState: function (state, reason) {
-                                    eventTarget.dispatchEvent(new CustomEvent("webrtcState", { detail: { state: state, reason: reason } }));
+                                webrtcState: function (state) {
+                                    eventTarget.dispatchEvent(new CustomEvent("webrtcState", { detail: { state: state } }));
                                 },
                                 iceState: function (state) {
                                     eventTarget.dispatchEvent(new CustomEvent("iceState", { detail: { state: state } }));

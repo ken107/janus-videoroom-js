@@ -23,6 +23,10 @@
     <script src="https://janus.conf.meetecho.com/demos/janus.js"></script>
     <script>
         const exports = {}
+        function require(name) {
+            if (name == "janus-gateway") return {default: Janus}
+            throw new Error("Unhandled import")
+        }
     </script>
     <script src="./dist/index.js"></script>
     <script>

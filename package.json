@@ -4,7 +4,7 @@
   "description": "Provides a simple high-level API that makes it easy to work with the Janus VideoRoom plugin",
   "main": "dist/index.js",
   "scripts": {
-    "build": "tsc && cp src/janus.d.ts dist"
+    "build": "tsc"
   },
   "repository": {
     "type": "git",
@@ -18,5 +18,8 @@
   "homepage": "https://github.com/ken107/janus-videoroom-js#readme",
   "devDependencies": {
     "typescript": "^4.9.4"
+  },
+  "dependencies": {
+    "janus-gateway": "^1.2.1"
   }
 }

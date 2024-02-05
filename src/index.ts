@@ -1,4 +1,59 @@
-import { JanusMediaOptions, JanusMessage, JanusMid, JanusPluginHandle, JanusPublishOptions, JanusSession, JanusSessionOptions, JanusStreamSpec, JanusSubscriberConfigureOptions, JanusWatchOptions, Jsep } from "./janus"
+import Janus from "janus-gateway"
+
+type JanusSessionOptions = ConstructorParameters<typeof Janus>[0]
+type JanusPluginOptions = Parameters<Janus["attach"]>[0]
+type JanusPluginHandle = Parameters<NonNullable<JanusPluginOptions["success"]>>[0]
+type JanusMid = unknown
+type JanusOfferParams = Parameters<JanusPluginHandle["createOffer"]>[0]
+type JanusTrackOption = NonNullable<JanusOfferParams["tracks"]>[number]
+type Jsep = Parameters<NonNullable<JanusOfferParams["success"]>>[0]
+
+interface JanusMessage {
+    [key: string]: any
+}
+
+interface JanusMediaOptions {
+    tracks?: JanusTrackOption[]
+    trickle?: boolean
+    stream?: MediaStream
+    customizeSdp?: (jsep: Jsep) => void
+    customizeRemoteSdp?: (jsep: Jsep) => void
+}
+
+interface JanusStreamSpec {
+    feed: unknown
+    mid?: JanusMid
+}
+
+interface JanusWatchOptions {
+    pin?: string
+    media?: string[]
+}
+
+interface JanusPublishOptions {
+    audiocodec?: string
+    videocodec?: string
+    bitrate?: number
+    record?: boolean
+    filename?: string
+    display?: string
+    audio_level_average?: number
+    audio_active_packets?: number
+    descriptions?: {mid: JanusMid, description: string}[]
+}
+
+interface JanusSubscriberConfigureOptions {
+    mid?: JanusMid
+    send?: boolean
+    substream?: number
+    temporal?: number
+    fallback?: number
+    spatial_layer?: number
+    temporal_layer?: number
+    audio_level_average?: number
+    audio_active_packets?: number
+}
+
 
 export interface VideoRoomClient {
     createSession(server: string|string[], options?: JanusSessionOptions): Promise<VideoRoomSession>
@@ -60,8 +115,9 @@ export interface StreamingSubscriber {
 
 export interface JanusPluginHandleEx extends JanusPluginHandle {
     eventTarget: ReturnType<typeof makeEventTarget>
-    sendRequest(message: JanusMessage): Promise<JanusMessage>
-    sendAsyncRequest(options: {message: JanusMessage, jsep?: Jsep, expectResponse: (response: AsyncResponse) => boolean}): Promise<AsyncResponse>
+    sendRequest(message: JanusMessage & {request: string}): Promise<JanusMessage>
+    sendAsyncRequest(options: {message: JanusMessage & {request: string}, jsep?: Jsep, expectResponse: (response: AsyncResponse) => boolean}): Promise<AsyncResponse>
+    handleRemoteJsep(params: Parameters<JanusPluginHandle["handleRemoteJsep"]>[0] & {customizeSdp?: (jsep: Jsep) => void}): void
 }
 
 interface AsyncResponse {
@@ -72,10 +128,7 @@ interface AsyncResponse {
 
 
 export async function createVideoRoomClient(
-    options?: {
-        debug?: boolean|string[],
-        dependencies?: unknown
-    }
+    options?: Parameters<typeof Janus.init>[0]
 ): Promise<VideoRoomClient> {
     await new Promise(f => Janus.init({...options, callback: f}))
 
@@ -89,7 +142,7 @@ export async function createVideoRoomClient(
 
 async function createVideoRoomSession(server: string|string[], options?: JanusSessionOptions): Promise<VideoRoomSession> {
     const eventTarget = makeEventTarget()
-    let session: JanusSession
+    let session: Janus
 
     await new Promise<void>(function(fulfill, reject) {
         let resolved = false
@@ -139,7 +192,7 @@ async function createVideoRoomSession(server: string|string[], options?: JanusSe
             return attachToPlugin(session, plugin)
         },
         async destroy() {
-            await new Promise(function(fulfill, reject) {
+            await new Promise<void>(function(fulfill, reject) {
                 session.destroy({
                     success: fulfill,
                     error: reject
@@ -151,20 +204,22 @@ async function createVideoRoomSession(server: string|string[], options?: JanusSe
 
 
 
-async function attachToPlugin(session: JanusSession, plugin: string): Promise<JanusPluginHandleEx> {
+async function attachToPlugin(session: Janus, plugin: string): Promise<JanusPluginHandleEx> {
     const pendingRequests: {acceptResponse(response: AsyncResponse): boolean}[] = []
     const eventTarget = makeEventTarget()
 
     const handle: JanusPluginHandleEx = await new Promise(function(fulfill, reject) {
         session.attach({
             plugin,
-            success: fulfill,
+            success(handle) {
+                fulfill(handle as JanusPluginHandleEx)
+            },
             error: reject,
             consentDialog(state: unknown) {
                 eventTarget.dispatchEvent(new CustomEvent("consentDialog", {detail: {state}}))
             },
-            webrtcState(state: unknown, reason: unknown) {
-                eventTarget.dispatchEvent(new CustomEvent("webrtcState", {detail: {state, reason}}))
+            webrtcState(state: unknown) {
+                eventTarget.dispatchEvent(new CustomEvent("webrtcState", {detail: {state}}))
             },
             iceState(state: unknown) {
                 eventTarget.dispatchEvent(new CustomEvent("iceState", {detail: {state}}))
@@ -175,7 +230,7 @@ async function attachToPlugin(session: JanusSession, plugin: string): Promise<Ja
             slowLink(state: unknown) {
                 eventTarget.dispatchEvent(new CustomEvent("slowLink", {detail: {state}}))
             },
-            onmessage(message: JanusMessage, jsep: Jsep) {
+            onmessage(message: JanusMessage, jsep?: Jsep) {
                 const response = {message, jsep}
                 const index = pendingRequests.findIndex(x => x.acceptResponse(response))
                 if (index != -1) pendingRequests.splice(index, 1)
@@ -258,7 +313,7 @@ async function attachToPlugin(session: JanusSession, plugin: string): Promise<Ja
 
 
 
-async function joinVideoRoom(session: JanusSession, roomId: string|number): Promise<VideoRoom> {
+async function joinVideoRoom(session: Janus, roomId: string|number): Promise<VideoRoom> {
     const cleanup = makeCleanup()
     const callbacks = makeCallbacks()
 
@@ -268,7 +323,7 @@ async function joinVideoRoom(session: JanusSession, roomId: string|number): Prom
 
         // remember to detach
         cleanup.add(async function() {
-            await new Promise(function(fulfill, reject) {
+            await new Promise<void>(function(fulfill, reject) {
                 handle.detach({
                     success: fulfill,
                     error: reject
@@ -403,7 +458,7 @@ async function createVideoRoomPublisher(
         // handle the answer JSEP
         await new Promise(function(fulfill, reject) {
             handle.handleRemoteJsep({
-                jsep: response.jsep,
+                jsep: response.jsep!,
                 success: fulfill,
                 error: reject,
                 customizeSdp: options.mediaOptions?.customizeRemoteSdp
@@ -445,7 +500,7 @@ async function createVideoRoomPublisher(
                 })
                 await new Promise(function(fulfill, reject) {
                     handle.handleRemoteJsep({
-                        jsep: response.jsep,
+                        jsep: response.jsep!,
                         customizeSdp: mediaOptions?.customizeRemoteSdp,
                         success: fulfill,
                         error: reject
@@ -467,7 +522,7 @@ async function createVideoRoomPublisher(
 
 
 async function createVideoRoomSubscriber(
-    session: JanusSession,
+    session: Janus,
     roomId: string|number,
     streams: JanusStreamSpec[],
     opts?: {
@@ -485,7 +540,7 @@ async function createVideoRoomSubscriber(
 
         // remember to detach
         cleanup.add(async function() {
-            await new Promise(function(fulfill, reject) {
+            await new Promise<void>(function(fulfill, reject) {
                 handle.detach({
                     success: fulfill,
                     error: reject
@@ -592,7 +647,7 @@ async function createVideoRoomSubscriber(
 
 
 async function createStreamingSubscriber(
-    session: JanusSession,
+    session: Janus,
     mountPointId: number,
     options?: {
         watchOptions?: JanusWatchOptions
@@ -609,7 +664,7 @@ async function createStreamingSubscriber(
 
         // remember to detach
         cleanup.add(async function() {
-            await new Promise(function(fulfill, reject) {
+            await new Promise<void>(function(fulfill, reject) {
                 handle.detach({
                     success: fulfill,
                     error: reject
