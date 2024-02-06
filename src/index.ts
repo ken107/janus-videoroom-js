@@ -6,27 +6,21 @@ import adapter from "webrtc-adapter"
 if (!(window as any).adapter) (window as any).adapter = adapter
 
 
-import Janus from "janus-gateway"
+import Janus, { JanusJS } from "janus-gateway"
 export { Janus }
 
-type JanusSessionOptions = ConstructorParameters<typeof Janus>[0]
-type JanusPluginOptions = Parameters<Janus["attach"]>[0]
-type JanusPluginHandle = Parameters<NonNullable<JanusPluginOptions["success"]>>[0]
 type JanusMid = unknown
-type JanusOfferParams = Parameters<JanusPluginHandle["createOffer"]>[0]
-type JanusTrackOption = NonNullable<JanusOfferParams["tracks"]>[number]
-type Jsep = Parameters<NonNullable<JanusOfferParams["success"]>>[0]
 
 interface JanusMessage {
     [key: string]: any
 }
 
 interface JanusMediaOptions {
-    tracks?: JanusTrackOption[]
+    tracks?: JanusJS.TrackOption[]
     trickle?: boolean
     stream?: MediaStream
-    customizeSdp?: (jsep: Jsep) => void
-    customizeRemoteSdp?: (jsep: Jsep) => void
+    customizeSdp?: (jsep: JanusJS.JSEP) => void
+    customizeRemoteSdp?: (jsep: JanusJS.JSEP) => void
 }
 
 interface JanusStreamSpec {
@@ -65,7 +59,7 @@ interface JanusSubscriberConfigureOptions {
 
 
 export interface VideoRoomClient {
-    createSession(server: string|string[], options?: JanusSessionOptions): Promise<VideoRoomSession>
+    createSession(server: string|string[], options?: Partial<JanusJS.ConstructorOptions>): Promise<VideoRoomSession>
 }
 
 export interface VideoRoomSession {
@@ -122,23 +116,21 @@ export interface StreamingSubscriber {
     unsubscribe(): Promise<void>
 }
 
-export interface JanusPluginHandleEx extends JanusPluginHandle {
+export interface JanusPluginHandleEx extends JanusJS.PluginHandle {
     eventTarget: ReturnType<typeof makeEventTarget>
     sendRequest(message: JanusMessage & {request: string}): Promise<JanusMessage>
-    sendAsyncRequest(options: {message: JanusMessage & {request: string}, jsep?: Jsep, expectResponse: (response: AsyncResponse) => boolean}): Promise<AsyncResponse>
-    handleRemoteJsep(params: Parameters<JanusPluginHandle["handleRemoteJsep"]>[0] & {customizeSdp?: (jsep: Jsep) => void}): void
+    sendAsyncRequest(options: {message: JanusMessage & {request: string}, jsep?: JanusJS.JSEP, expectResponse: (response: AsyncResponse) => boolean}): Promise<AsyncResponse>
+    handleRemoteJsep(params: JanusJS.PluginHandleRemoteJsepParam & {customizeSdp?: (jsep: JanusJS.JSEP) => void}): void
 }
 
 interface AsyncResponse {
     message: JanusMessage
-    jsep?: Jsep
+    jsep?: JanusJS.JSEP
 }
 
 
 
-export async function createVideoRoomClient(
-    options?: Parameters<typeof Janus.init>[0]
-): Promise<VideoRoomClient> {
+export async function createVideoRoomClient(options?: JanusJS.InitOptions): Promise<VideoRoomClient> {
     await new Promise(f => Janus.init({...options, callback: f}))
 
     // construct and return the VideoRoomClient object
@@ -149,9 +141,9 @@ export async function createVideoRoomClient(
 
 
 
-async function createVideoRoomSession(server: string|string[], options?: JanusSessionOptions): Promise<VideoRoomSession> {
+async function createVideoRoomSession(server: string|string[], options?: JanusJS.ConstructorOptions): Promise<VideoRoomSession> {
     const eventTarget = makeEventTarget()
-    let session: Janus
+    let session: JanusJS.Janus
 
     await new Promise<void>(function(fulfill, reject) {
         let resolved = false
@@ -213,7 +205,7 @@ async function createVideoRoomSession(server: string|string[], options?: JanusSe
 
 
 
-async function attachToPlugin(session: Janus, plugin: string): Promise<JanusPluginHandleEx> {
+async function attachToPlugin(session: JanusJS.Janus, plugin: string): Promise<JanusPluginHandleEx> {
     const pendingRequests: {acceptResponse(response: AsyncResponse): boolean}[] = []
     const eventTarget = makeEventTarget()
 
@@ -239,7 +231,7 @@ async function attachToPlugin(session: Janus, plugin: string): Promise<JanusPlug
             slowLink(state: unknown) {
                 eventTarget.dispatchEvent(new CustomEvent("slowLink", {detail: {state}}))
             },
-            onmessage(message: JanusMessage, jsep?: Jsep) {
+            onmessage(message: JanusMessage, jsep?: JanusJS.JSEP) {
                 const response = {message, jsep}
                 const index = pendingRequests.findIndex(x => x.acceptResponse(response))
                 if (index != -1) pendingRequests.splice(index, 1)
@@ -322,7 +314,7 @@ async function attachToPlugin(session: Janus, plugin: string): Promise<JanusPlug
 
 
 
-async function joinVideoRoom(session: Janus, roomId: string|number): Promise<VideoRoom> {
+async function joinVideoRoom(session: JanusJS.Janus, roomId: string|number): Promise<VideoRoom> {
     const cleanup = makeCleanup()
     const callbacks = makeCallbacks()
 
@@ -438,7 +430,7 @@ async function createVideoRoomPublisher(
 
     try {
         // send the publish request
-        const offerJsep = await new Promise<Jsep>(function(fulfill, reject) {
+        const offerJsep = await new Promise<JanusJS.JSEP>(function(fulfill, reject) {
             // the offer (local) sdp can be customized via mediaOptions.customizeSdp
             handle.createOffer({
                 ...options.mediaOptions,
@@ -493,7 +485,7 @@ async function createVideoRoomPublisher(
                 })
             },
             async restart(mediaOptions = options.mediaOptions) {
-                const offerJsep = await new Promise<Jsep>(function(fulfill, reject) {
+                const offerJsep = await new Promise<JanusJS.JSEP>(function(fulfill, reject) {
                     handle.createOffer({
                         ...mediaOptions,
                         success: fulfill,
@@ -531,7 +523,7 @@ async function createVideoRoomPublisher(
 
 
 async function createVideoRoomSubscriber(
-    session: Janus,
+    session: JanusJS.Janus,
     roomId: string|number,
     streams: JanusStreamSpec[],
     opts?: {
@@ -656,7 +648,7 @@ async function createVideoRoomSubscriber(
 
 
 async function createStreamingSubscriber(
-    session: Janus,
+    session: JanusJS.Janus,
     mountPointId: number,
     options?: {
         watchOptions?: JanusWatchOptions
@@ -774,14 +766,14 @@ async function createStreamingSubscriber(
 
 
 
-async function handleOffer(handle: JanusPluginHandleEx, offerJsep: Jsep, mediaOptions?: JanusMediaOptions): Promise<void> {
+async function handleOffer(handle: JanusPluginHandleEx, offerJsep: JanusJS.JSEP, mediaOptions?: JanusMediaOptions): Promise<void> {
     // allow customizing the remote (offer) sdp
     if (mediaOptions?.customizeRemoteSdp) {
         mediaOptions.customizeRemoteSdp(offerJsep)
     }
 
     // create and send the answer
-    const answerJsep = await new Promise<Jsep>(function(fulfill, reject) {
+    const answerJsep = await new Promise<JanusJS.JSEP>(function(fulfill, reject) {
         // the answer (local) sdp can be customized via mediaOptions.customizeSdp
         handle.createAnswer({
             ...mediaOptions,
