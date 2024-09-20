@@ -344,15 +344,13 @@ function createVideoRoomPublisher(handle, publisherId, opts) {
                         });
                     });
                 },
-                restart(mediaOptions = options.mediaOptions) {
+                restart(mediaOptions = options.mediaOptions, publishOptions) {
                     return __awaiter(this, void 0, void 0, function* () {
                         const offerJsep = yield new Promise(function (fulfill, reject) {
                             handle.createOffer(Object.assign(Object.assign({}, mediaOptions), { success: fulfill, error: reject }));
                         });
                         const response = yield handle.sendAsyncRequest({
-                            message: {
-                                request: "configure",
-                            },
+                            message: Object.assign(Object.assign({}, publishOptions), { request: "configure" }),
                             jsep: offerJsep,
                             expectResponse: r => r.message.videoroom == "event" && r.message.configured == "ok"
                         });

@@ -33,6 +33,16 @@ interface JanusPublishOptions {
         description: string;
     }[];
 }
+interface JanusPublisherConfigureOptions extends JanusPublishOptions {
+    keyframe?: boolean;
+    streams?: Array<{
+        mid: JanusMid;
+        keyframe?: boolean;
+        send?: boolean;
+        min_delay?: number;
+        max_delay?: number;
+    }>;
+}
 interface JanusSubscriberConfigureOptions {
     mid?: JanusMid;
     send?: boolean;
@@ -79,8 +89,8 @@ export interface VideoRoomPublisher {
     publisherId: string | number;
     onTrackAdded(callback: (track: MediaStreamTrack) => void): void;
     onTrackRemoved(callback: (track: MediaStreamTrack) => void): void;
-    configure(configureOptions: JanusPublishOptions): Promise<void>;
-    restart(mediaOptions?: JanusMediaOptions): Promise<void>;
+    configure(configureOptions: JanusPublisherConfigureOptions): Promise<void>;
+    restart(mediaOptions?: JanusMediaOptions, publishOptions?: JanusPublishOptions): Promise<void>;
     unpublish(): Promise<void>;
 }
 export interface VideoRoomSubscriber {
