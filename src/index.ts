@@ -799,7 +799,7 @@ async function handleOffer(handle: JanusPluginHandleEx, offerJsep: JanusJS.JSEP,
         message: {request: "start"},
         jsep: answerJsep,
         expectResponse: r => r.message.videoroom == "event" && r.message.started == "ok" ||
-            r.message.streaming == "event" && r.message.result?.status == "starting"
+            r.message.streaming == "event" && r.message.result?.status == "started"
     })
 }
 

@@ -630,7 +630,7 @@ function handleOffer(handle, offerJsep, mediaOptions) {
             expectResponse: r => {
                 var _a;
                 return r.message.videoroom == "event" && r.message.started == "ok" ||
-                    r.message.streaming == "event" && ((_a = r.message.result) === null || _a === void 0 ? void 0 : _a.status) == "starting";
+                    r.message.streaming == "event" && ((_a = r.message.result) === null || _a === void 0 ? void 0 : _a.status) == "started";
             }
         });
     });
