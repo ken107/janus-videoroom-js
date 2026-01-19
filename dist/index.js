@@ -9,7 +9,8 @@ var __awaiter = (this && this.__awaiter) || function (thisArg, _arguments, P, ge
     });
 };
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.createVideoRoomClient = exports.Janus = void 0;
+exports.Janus = void 0;
+exports.createVideoRoomClient = createVideoRoomClient;
 /**
  * Remove this once janus.js properly imports webrtc-adapter.
  * Currently janus npm package depends on webrtc-adapter but does not import it, and so it gets dropped during tree shaking.
@@ -28,7 +29,6 @@ function createVideoRoomClient(options) {
         };
     });
 }
-exports.createVideoRoomClient = createVideoRoomClient;
 function createVideoRoomSession(server, options) {
     return __awaiter(this, void 0, void 0, function* () {
         const eventTarget = makeEventTarget();
@@ -344,8 +344,8 @@ function createVideoRoomPublisher(handle, publisherId, opts) {
                         });
                     });
                 },
-                restart(mediaOptions = options.mediaOptions, publishOptions) {
-                    return __awaiter(this, void 0, void 0, function* () {
+                restart() {
+                    return __awaiter(this, arguments, void 0, function* (mediaOptions = options.mediaOptions, publishOptions) {
                         const offerJsep = yield new Promise(function (fulfill, reject) {
                             handle.createOffer(Object.assign(Object.assign({}, mediaOptions), { success: fulfill, error: reject }));
                         });
@@ -476,8 +476,8 @@ function createVideoRoomSubscriber(session, roomId, streams, opts) {
                         });
                     });
                 },
-                restart(mediaOptions = options.mediaOptions) {
-                    return __awaiter(this, void 0, void 0, function* () {
+                restart() {
+                    return __awaiter(this, arguments, void 0, function* (mediaOptions = options.mediaOptions) {
                         const response = yield handle.sendAsyncRequest({
                             message: {
                                 request: "configure",
@@ -588,8 +588,8 @@ function createStreamingSubscriber(session, mountPointId, options) {
                         mountPointId = newMountPointId;
                     });
                 },
-                restart(newOptions = options) {
-                    return __awaiter(this, void 0, void 0, function* () {
+                restart() {
+                    return __awaiter(this, arguments, void 0, function* (newOptions = options) {
                         const response = yield handle.sendAsyncRequest({
                             message: Object.assign(Object.assign({}, newOptions === null || newOptions === void 0 ? void 0 : newOptions.watchOptions), { request: "watch", id: mountPointId }),
                             expectResponse: r => { var _a; return r.message.streaming == "event" && ((_a = r.message.result) === null || _a === void 0 ? void 0 : _a.status) == "preparing"; }
