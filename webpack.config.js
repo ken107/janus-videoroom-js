@@ -1,6 +1,7 @@
 const path = require("path")
 
 module.exports = {
+  devtool: 'source-map',
   entry: './src/index.ts',
   module: {
     rules: [
@@ -17,6 +18,9 @@ module.exports = {
   output: {
     path: path.resolve(__dirname, "docs"),
     filename: 'videoroom.js',
-    library: "videoroom",
+    library: {
+      name: 'videoroom',
+      type: 'umd',
+    },
   },
 }

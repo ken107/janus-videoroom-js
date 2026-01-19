@@ -692,3 +692,4 @@ function makeEventTarget() {
         }
     };
 }
+//# sourceMappingURL=index.js.map
